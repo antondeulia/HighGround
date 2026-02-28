@@ -11,11 +11,28 @@ contextBridge.exposeInMainWorld('electron', {
   openInstanceTerminal: (instancePath, terminal) =>
     ipcRenderer.invoke('instance:open-terminal', instancePath, terminal),
   openInstanceVsCode: (instancePath, ide) => ipcRenderer.invoke('instance:open-vscode', instancePath, ide),
+  startPlugin: (pluginId) => ipcRenderer.invoke('plugin:start', pluginId),
+  stopPlugin: (pluginId) => ipcRenderer.invoke('plugin:stop', pluginId),
+  getPluginStatus: (pluginId) => ipcRenderer.invoke('plugin:status', pluginId),
   onInstanceExit: (handler) => {
     const listener = (_event, instanceId) => handler(instanceId);
     ipcRenderer.on('instance:exit', listener);
     return () => {
       ipcRenderer.removeListener('instance:exit', listener);
+    };
+  },
+  onPluginLog: (handler) => {
+    const listener = (_event, payload) => handler(payload);
+    ipcRenderer.on('plugin:log', listener);
+    return () => {
+      ipcRenderer.removeListener('plugin:log', listener);
+    };
+  },
+  onPluginExit: (handler) => {
+    const listener = (_event, payload) => handler(payload);
+    ipcRenderer.on('plugin:exit', listener);
+    return () => {
+      ipcRenderer.removeListener('plugin:exit', listener);
     };
   }
 });

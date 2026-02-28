@@ -6,19 +6,33 @@ import styles from './Workspace.module.css';
 interface SidebarProps {
   theme: ThemeMode;
   onThemeChange: (theme: ThemeMode) => void;
+  activeSection: 'projects' | 'plugins' | 'settings';
+  onSectionChange: (section: 'projects' | 'plugins' | 'settings') => void;
 }
 
-export function Sidebar({ theme, onThemeChange }: SidebarProps) {
+export function Sidebar({ theme, onThemeChange, activeSection, onSectionChange }: SidebarProps) {
   return (
     <aside className={styles.sidebar}>
       <nav className={styles.menu}>
-        <button className={`${styles.menuItem} ${styles.menuItemActive}`} type="button">
+        <button
+          className={`${styles.menuItem} ${activeSection === 'projects' ? styles.menuItemActive : ''}`}
+          type="button"
+          onClick={() => onSectionChange('projects')}
+        >
           Projects
         </button>
-        <button className={styles.menuItem} type="button">
-          Utils
+        <button
+          className={`${styles.menuItem} ${activeSection === 'plugins' ? styles.menuItemActive : ''}`}
+          type="button"
+          onClick={() => onSectionChange('plugins')}
+        >
+          Plugins
         </button>
-        <button className={styles.menuItem} type="button">
+        <button
+          className={`${styles.menuItem} ${activeSection === 'settings' ? styles.menuItemActive : ''}`}
+          type="button"
+          onClick={() => onSectionChange('settings')}
+        >
           Settings
         </button>
       </nav>

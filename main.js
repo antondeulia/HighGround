@@ -9,6 +9,15 @@ const APP_URL = `http://localhost:${NEXT_PORT}`;
 let nextProcess = null;
 let mainWindow = null;
 const instanceProcesses = new Map();
+const pluginProcesses = new Map();
+
+const PLUGIN_REGISTRY = {
+  'codex-auto-submit': {
+    id: 'codex-auto-submit',
+    title: 'Codex Auto-Submit',
+    scriptPath: path.join(__dirname, 'src', 'plugins', 'CodexAutoSubmit.js')
+  }
+};
 
 function resolveGitBashPath() {
   const candidates = [
@@ -77,6 +86,57 @@ function stopInstanceProcess(instanceId) {
   }
 
   instanceProcesses.delete(instanceId);
+  return true;
+}
+
+function sendPluginLog(pluginId, line) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('plugin:log', {
+    pluginId,
+    timestamp: new Date().toISOString(),
+    line
+  });
+}
+
+function streamPluginOutput(pluginId, stream) {
+  let buffer = '';
+
+  stream.on('data', (chunk) => {
+    buffer += chunk.toString();
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      const trimmed = line.trimEnd();
+      if (trimmed.length > 0) {
+        sendPluginLog(pluginId, trimmed);
+      }
+    }
+  });
+
+  stream.on('end', () => {
+    const last = buffer.trimEnd();
+    if (last.length > 0) {
+      sendPluginLog(pluginId, last);
+    }
+  });
+}
+
+function stopPluginProcess(pluginId) {
+  const entry = pluginProcesses.get(pluginId);
+  if (!entry || !entry.process || entry.process.killed) {
+    pluginProcesses.delete(pluginId);
+    return false;
+  }
+
+  entry.stopping = true;
+  const proc = entry.process;
+
+  if (process.platform === 'win32') {
+    spawn('taskkill', ['/pid', String(proc.pid), '/t', '/f'], { shell: true });
+  } else {
+    proc.kill('SIGTERM');
+  }
+
   return true;
 }
 
@@ -149,6 +209,10 @@ app.on('before-quit', () => {
 
   for (const instanceId of instanceProcesses.keys()) {
     stopInstanceProcess(instanceId);
+  }
+
+  for (const pluginId of pluginProcesses.keys()) {
+    stopPluginProcess(pluginId);
   }
 });
 
@@ -290,4 +354,92 @@ ipcMain.handle('instance:stop', async (_event, instanceId) => {
 
   stopInstanceProcess(instanceId);
   return { ok: true };
+});
+
+ipcMain.handle('plugin:status', async (_event, pluginId) => {
+  if (!pluginId || typeof pluginId !== 'string') {
+    return { ok: false, error: 'Invalid plugin id.' };
+  }
+
+  const entry = pluginProcesses.get(pluginId);
+  if (entry && entry.process && !entry.process.killed) {
+    return { ok: true, status: 'running' };
+  }
+
+  return { ok: true, status: 'stopped' };
+});
+
+ipcMain.handle('plugin:start', async (_event, pluginId) => {
+  if (!pluginId || typeof pluginId !== 'string') {
+    return { ok: false, error: 'Invalid plugin id.' };
+  }
+
+  const plugin = PLUGIN_REGISTRY[pluginId];
+  if (!plugin) {
+    return { ok: false, error: `Unknown plugin: ${pluginId}` };
+  }
+
+  const existing = pluginProcesses.get(pluginId);
+  if (existing && existing.process && !existing.process.killed) {
+    return { ok: true, status: 'running' };
+  }
+
+  if (!fs.existsSync(plugin.scriptPath)) {
+    return { ok: false, error: `Plugin script not found: ${plugin.scriptPath}` };
+  }
+
+  try {
+    const proc = spawn('node', [plugin.scriptPath], {
+      cwd: __dirname,
+      shell: true,
+      windowsHide: true,
+      detached: false,
+      env: process.env
+    });
+
+    const entry = { process: proc, stopping: false };
+    pluginProcesses.set(pluginId, entry);
+
+    sendPluginLog(pluginId, `[Plugin] ${plugin.title} started.`);
+    if (proc.stdout) streamPluginOutput(pluginId, proc.stdout);
+    if (proc.stderr) streamPluginOutput(pluginId, proc.stderr);
+
+    proc.on('exit', (code, signal) => {
+      const finishedEntry = pluginProcesses.get(pluginId);
+      pluginProcesses.delete(pluginId);
+
+      const stoppedByUser = Boolean(finishedEntry?.stopping);
+      const ok = stoppedByUser || code === 0 || signal === 'SIGTERM' || signal === 'SIGINT';
+      const reason = stoppedByUser
+        ? 'Stopped by user.'
+        : `Exited with code=${code ?? 'null'} signal=${signal ?? 'null'}.`;
+
+      sendPluginLog(pluginId, `[Plugin] ${reason}`);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('plugin:exit', { pluginId, ok, error: ok ? undefined : reason });
+      }
+    });
+
+    proc.on('error', (error) => {
+      pluginProcesses.delete(pluginId);
+      const message = error instanceof Error ? error.message : 'Plugin process failed.';
+      sendPluginLog(pluginId, `[Plugin] ${message}`);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('plugin:exit', { pluginId, ok: false, error: message });
+      }
+    });
+
+    return { ok: true, status: 'running' };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Failed to start plugin.' };
+  }
+});
+
+ipcMain.handle('plugin:stop', async (_event, pluginId) => {
+  if (!pluginId || typeof pluginId !== 'string') {
+    return { ok: false, error: 'Invalid plugin id.' };
+  }
+
+  stopPluginProcess(pluginId);
+  return { ok: true, status: 'stopped' };
 });

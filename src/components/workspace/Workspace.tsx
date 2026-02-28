@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { Project, ProjectsViewMode, ThemeMode } from '@/types/project';
@@ -7,6 +7,7 @@ import { Sidebar } from './Sidebar';
 import { ProjectsView } from './ProjectsView';
 import { ProjectDetailView } from './ProjectDetailView';
 import { CreateProjectPanel } from './CreateProjectPanel';
+import { PluginsView } from './PluginsView';
 import styles from './Workspace.module.css';
 
 interface CreateResult {
@@ -18,8 +19,23 @@ interface CreateResult {
 
 type TerminalProfile = 'git-bash' | 'powershell' | 'cmd';
 type IdeProfile = 'vscode' | 'cursor';
+type WorkspaceSection = 'projects' | 'plugins' | 'settings';
+
+interface WorkspaceTab {
+  id: string;
+  projectId: string | null;
+}
 
 const PROJECTS_STORAGE_KEY = 'folder-manager.projects.v1';
+
+function createTab(projectId: string | null = null): WorkspaceTab {
+  const tabId =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  return { id: tabId, projectId };
+}
 
 function normalizeProjects(rawProjects: Project[]): Project[] {
   return rawProjects.map((project) => ({
@@ -36,9 +52,11 @@ function normalizeProjects(rawProjects: Project[]): Project[] {
 
 export function Workspace() {
   const [theme, setTheme] = useState<ThemeMode>('hybrid');
+  const [activeSection, setActiveSection] = useState<WorkspaceSection>('projects');
   const [viewMode, setViewMode] = useState<ProjectsViewMode>('cards');
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [tabs, setTabs] = useState<WorkspaceTab[]>(() => [createTab()]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
 
   const [search, setSearch] = useState('');
@@ -59,9 +77,12 @@ export function Workspace() {
   const [createInstanceError, setCreateInstanceError] = useState(false);
   const [folderPickerBusy, setFolderPickerBusy] = useState(false);
 
+  const activeTab = useMemo(() => tabs.find((tab) => tab.id === activeTabId) ?? null, [tabs, activeTabId]);
+  const activeProjectId = activeTab?.projectId ?? null;
+
   const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedProjectId) ?? null,
-    [projects, selectedProjectId]
+    () => projects.find((project) => project.id === activeProjectId) ?? null,
+    [projects, activeProjectId]
   );
 
   const filteredProjects = useMemo(() => {
@@ -98,6 +119,28 @@ export function Workspace() {
     if (!projectsLoaded) return;
     window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
   }, [projects, projectsLoaded]);
+
+  useEffect(() => {
+    if (tabs.length === 0) {
+      const fallback = createTab();
+      setTabs([fallback]);
+      setActiveTabId(fallback.id);
+      return;
+    }
+
+    if (activeTabId && tabs.some((tab) => tab.id === activeTabId)) return;
+    setActiveTabId(tabs[0].id);
+  }, [tabs, activeTabId]);
+
+  useEffect(() => {
+    setTabs((prev) =>
+      prev.map((tab) => {
+        if (!tab.projectId) return tab;
+        if (projects.some((project) => project.id === tab.projectId)) return tab;
+        return { ...tab, projectId: null };
+      })
+    );
+  }, [projects]);
 
   useEffect(() => {
     if (!createOpen && !createInstanceOpen) return;
@@ -201,7 +244,7 @@ export function Workspace() {
   }
 
   async function handleCreateInstanceSubmit() {
-    if (!selectedProject || !selectedProjectId) return;
+    if (!selectedProject || !activeProjectId) return;
     if (!newInstanceName.trim() || !newInstancePath.trim()) {
       setCreateInstanceError(true);
       setCreateInstanceStatus('Укажи имя инстанса и путь.');
@@ -224,7 +267,7 @@ export function Workspace() {
     const instance = createInstance(newInstanceName.trim(), result.folderPath, newInstanceTag.trim() || 'latest');
     setProjects((prev) =>
       prev.map((project) =>
-        project.id === selectedProjectId
+        project.id === activeProjectId
           ? { ...project, instances: [instance, ...project.instances] }
           : project
       )
@@ -253,9 +296,7 @@ export function Workspace() {
 
   function handleDeleteProject(projectId: string) {
     setProjects((prev) => prev.filter((project) => project.id !== projectId));
-    if (selectedProjectId === projectId) {
-      setSelectedProjectId(null);
-    }
+    setTabs((prev) => prev.map((tab) => (tab.projectId === projectId ? { ...tab, projectId: null } : tab)));
   }
 
   function handleEditProject(projectId: string) {
@@ -274,9 +315,9 @@ export function Workspace() {
   }
 
   function handleToggleInstanceRun(instanceId: string) {
-    if (!selectedProjectId) return;
+    if (!activeProjectId) return;
 
-    const selected = projects.find((project) => project.id === selectedProjectId);
+    const selected = projects.find((project) => project.id === activeProjectId);
     if (!selected) return;
 
     const instance = selected.instances.find((item) => item.id === instanceId);
@@ -292,7 +333,7 @@ export function Workspace() {
 
         setProjects((prev) =>
           prev.map((project) => {
-            if (project.id !== selectedProjectId) return project;
+            if (project.id !== activeProjectId) return project;
             return {
               ...project,
               instances: project.instances.map((item) =>
@@ -324,7 +365,7 @@ export function Workspace() {
 
       setProjects((prev) =>
         prev.map((project) => {
-          if (project.id !== selectedProjectId) return project;
+          if (project.id !== activeProjectId) return project;
           return {
             ...project,
             instances: project.instances.map((item) =>
@@ -337,11 +378,11 @@ export function Workspace() {
   }
 
   function handleUpdateInstanceCommand(instanceId: string, command: string) {
-    if (!selectedProjectId) return;
+    if (!activeProjectId) return;
 
     setProjects((prev) =>
       prev.map((project) => {
-        if (project.id !== selectedProjectId) return project;
+        if (project.id !== activeProjectId) return project;
         return {
           ...project,
           instances: project.instances.map((instance) =>
@@ -353,9 +394,9 @@ export function Workspace() {
   }
 
   function handleOpenInstanceTerminal(instanceId: string, terminal: TerminalProfile) {
-    if (!selectedProjectId) return;
+    if (!activeProjectId) return;
 
-    const selected = projects.find((project) => project.id === selectedProjectId);
+    const selected = projects.find((project) => project.id === activeProjectId);
     const instance = selected?.instances.find((item) => item.id === instanceId);
     if (!instance) return;
 
@@ -369,9 +410,9 @@ export function Workspace() {
   }
 
   function handleOpenInstanceVsCode(instanceId: string, ide: IdeProfile) {
-    if (!selectedProjectId) return;
+    if (!activeProjectId) return;
 
-    const selected = projects.find((project) => project.id === selectedProjectId);
+    const selected = projects.find((project) => project.id === activeProjectId);
     const instance = selected?.instances.find((item) => item.id === instanceId);
     if (!instance) return;
 
@@ -385,11 +426,11 @@ export function Workspace() {
   }
 
   function handleDeleteInstance(instanceId: string) {
-    if (!selectedProjectId) return;
+    if (!activeProjectId) return;
 
     setProjects((prev) =>
       prev.map((project) => {
-        if (project.id !== selectedProjectId) return project;
+        if (project.id !== activeProjectId) return project;
         return {
           ...project,
           instances: project.instances.filter((instance) => instance.id !== instanceId)
@@ -414,6 +455,64 @@ export function Workspace() {
       unsubscribe?.();
     };
   }, []);
+
+  function handleOpenProject(projectId: string) {
+    setActiveSection('projects');
+    setTabs((prev) => {
+      if (!activeTabId || !prev.some((tab) => tab.id === activeTabId)) {
+        const nextTab = createTab(projectId);
+        setActiveTabId(nextTab.id);
+        return [...prev, nextTab];
+      }
+
+      return prev.map((tab) => (tab.id === activeTabId ? { ...tab, projectId } : tab));
+    });
+    setInstanceSearch('');
+    setCreateInstanceOpen(false);
+  }
+
+  function handleSelectTab(tabId: string) {
+    setActiveSection('projects');
+    setActiveTabId(tabId);
+    setInstanceSearch('');
+    setCreateInstanceOpen(false);
+  }
+
+  function handleCloseTab(tabId: string) {
+    setTabs((prev) => {
+      const removedIndex = prev.findIndex((tab) => tab.id === tabId);
+      if (removedIndex === -1) return prev;
+
+      if (prev.length === 1) {
+        return [{ ...prev[0], projectId: null }];
+      }
+
+      const next = prev.filter((tab) => tab.id !== tabId);
+      if (activeTabId === tabId) {
+        const nextIndex = Math.min(removedIndex, next.length - 1);
+        setActiveTabId(next[nextIndex].id);
+      }
+      return next;
+    });
+    setInstanceSearch('');
+    setCreateInstanceOpen(false);
+  }
+
+  function handleAddTab() {
+    const nextTab = createTab();
+    setTabs((prev) => [...prev, nextTab]);
+    setActiveTabId(nextTab.id);
+    setActiveSection('projects');
+    setInstanceSearch('');
+    setCreateInstanceOpen(false);
+  }
+
+  function handleBackToProjectsList() {
+    if (!activeTabId) return;
+    setTabs((prev) => prev.map((tab) => (tab.id === activeTabId ? { ...tab, projectId: null } : tab)));
+    setInstanceSearch('');
+    setCreateInstanceOpen(false);
+  }
 
   const rootClass = `${styles.workspace} ${styles[`theme${theme[0].toUpperCase()}${theme.slice(1)}`]}`;
 
@@ -446,10 +545,51 @@ export function Workspace() {
       </header>
 
       <div className={styles.workspaceBody}>
-        <Sidebar theme={theme} onThemeChange={setTheme} />
+        <Sidebar
+          theme={theme}
+          onThemeChange={setTheme}
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+        />
 
         <main className={styles.main}>
-          {!selectedProject ? (
+          <section className={styles.projectTabsBar} aria-label="Open project tabs">
+            <div className={styles.projectTabs}>
+              {tabs.map((tab) => {
+                const tabProject = tab.projectId ? projects.find((project) => project.id === tab.projectId) ?? null : null;
+                const tabTitle = tabProject?.name ?? 'Новая вкладка';
+                return (
+                  <div key={tab.id} className={`${styles.projectTab} ${activeTabId === tab.id ? styles.projectTabActive : ''}`}>
+                    <button type="button" className={styles.projectTabSelect} onClick={() => handleSelectTab(tab.id)}>
+                      <span className={styles.projectTabName}>{tabTitle}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.projectTabClose}
+                      aria-label={`Close ${tabTitle} tab`}
+                      onClick={() => handleCloseTab(tab.id)}
+                    >
+                      x
+                    </button>
+                  </div>
+                );
+              })}
+              <button type="button" className={styles.projectTabAdd} aria-label="New tab" onClick={handleAddTab}>
+                +
+              </button>
+            </div>
+          </section>
+
+          {activeSection === 'plugins' ? (
+            <PluginsView />
+          ) : activeSection === 'settings' ? (
+            <section className={styles.pluginsView}>
+              <header className={styles.contentHeader}>
+                <h1>Settings</h1>
+                <p>Раздел в разработке.</p>
+              </header>
+            </section>
+          ) : !selectedProject ? (
             <>
               <ProjectsView
                 viewMode={viewMode}
@@ -462,7 +602,7 @@ export function Workspace() {
                 onCreateToggle={() => {
                   void handleCreateClick();
                 }}
-                onOpenProject={setSelectedProjectId}
+                onOpenProject={handleOpenProject}
                 onToggleProjectRun={handleToggleProjectRun}
                 onDeleteProject={handleDeleteProject}
                 onEditProject={handleEditProject}
@@ -491,11 +631,7 @@ export function Workspace() {
               createInstancePath={newInstancePath}
               createInstanceStatus={createInstanceStatus}
               createInstanceError={createInstanceError}
-              onBack={() => {
-                setSelectedProjectId(null);
-                setInstanceSearch('');
-                setCreateInstanceOpen(false);
-              }}
+              onBack={handleBackToProjectsList}
               onInstanceSearchChange={setInstanceSearch}
               onToggleInstanceRun={handleToggleInstanceRun}
               onDeleteInstance={handleDeleteInstance}

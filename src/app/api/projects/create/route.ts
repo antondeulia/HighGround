@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const targetPath = String(payload.targetPath ?? '').trim();
 
   if (!targetPath) {
-    return NextResponse.json({ ok: false, error: 'Укажи путь проекта.' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: 'Provide project path.' }, { status: 400 });
   }
 
   const folderPath = path.normalize(targetPath);
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      { ok: false, error: maybe?.message || 'Не удалось создать папку.' },
+      { ok: false, error: maybe?.message || 'Failed to create folder.' },
       { status: 500 }
     );
   }

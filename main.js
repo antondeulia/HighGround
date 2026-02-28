@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, Tray, dialog, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -13,6 +13,8 @@ let nextProcess = null;
 let nextServer = null;
 let nextApp = null;
 let mainWindow = null;
+let tray = null;
+let isQuitting = false;
 const instanceProcesses = new Map();
 const pluginProcesses = new Map();
 
@@ -145,6 +147,37 @@ function stopPluginProcess(pluginId) {
   return true;
 }
 
+function runProcessAndWait(file, args) {
+  return new Promise((resolve) => {
+    try {
+      const proc = spawn(file, args, { windowsHide: true, shell: false });
+      proc.on('exit', () => resolve());
+      proc.on('error', () => resolve());
+    } catch {
+      resolve();
+    }
+  });
+}
+
+async function closeEditors(ide = 'vscode') {
+  if (process.platform === 'win32') {
+    const imageNames =
+      ide === 'cursor'
+        ? ['cursor.exe']
+        : ['code.exe', 'code-insiders.exe', 'cursor.exe'];
+
+    await Promise.all(
+      imageNames.map((imageName) => runProcessAndWait('taskkill', ['/im', imageName, '/t', '/f']))
+    );
+    return;
+  }
+
+  const processNames =
+    ide === 'cursor' ? ['cursor'] : ['code', 'code-insiders', 'cursor'];
+
+  await Promise.all(processNames.map((name) => runProcessAndWait('pkill', ['-f', name])));
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -161,6 +194,49 @@ function createWindow() {
   });
 
   mainWindow.loadURL(APP_URL);
+
+  mainWindow.on('close', (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    mainWindow.hide();
+  });
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function createTray() {
+  if (tray) return;
+
+  const iconPath = path.join(__dirname, 'public', 'icons', 'openai.png');
+  tray = new Tray(iconPath);
+  tray.setToolTip('Folder Manager');
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Open',
+      click: () => showMainWindow()
+    },
+    {
+      type: 'separator'
+    },
+    {
+      label: 'Exit',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setContextMenu(contextMenu);
+  tray.on('double-click', () => showMainWindow());
 }
 
 function startNextDevServer() {
@@ -171,6 +247,7 @@ function startNextDevServer() {
     shell: true,
     env: {
       ...process.env,
+      NODE_ENV: 'development',
       BROWSER: 'none',
       PORT: String(NEXT_PORT)
     },
@@ -218,6 +295,7 @@ async function boot() {
   }
 
   createWindow();
+  createTray();
 }
 
 app.whenReady().then(boot).catch((error) => {
@@ -226,12 +304,14 @@ app.whenReady().then(boot).catch((error) => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  if (isQuitting && process.platform !== 'darwin') {
     app.quit();
   }
 });
 
 app.on('before-quit', () => {
+  isQuitting = true;
+
   if (nextProcess) {
     nextProcess.kill();
     nextProcess = null;
@@ -244,6 +324,11 @@ app.on('before-quit', () => {
 
   if (nextApp) {
     nextApp = null;
+  }
+
+  if (tray) {
+    tray.destroy();
+    tray = null;
   }
 });
 
@@ -272,7 +357,7 @@ ipcMain.on('window:maximize-toggle', (event) => {
 });
 
 ipcMain.on('window:close', (event) => {
-  BrowserWindow.fromWebContents(event.sender)?.close();
+  BrowserWindow.fromWebContents(event.sender)?.hide();
 });
 
 ipcMain.handle('instance:open-terminal', async (_event, instancePath, terminal) => {
@@ -324,6 +409,40 @@ ipcMain.handle('instance:open-vscode', async (_event, instancePath, ide) => {
     return {
       ok: false,
       error: error instanceof Error ? error.message : `Failed to open ${ide || 'IDE'}.`
+    };
+  }
+});
+
+ipcMain.handle('editor:close-all', async (_event, ide) => {
+  try {
+    await closeEditors(typeof ide === 'string' ? ide : 'vscode');
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Failed to close editor processes.'
+    };
+  }
+});
+
+ipcMain.handle('editor:start', async (_event, ide) => {
+  try {
+    const normalizedIde = typeof ide === 'string' ? ide : 'vscode';
+    const editorCommand = resolveEditorCommand(normalizedIde);
+    const editorArgs = normalizedIde === 'vscode' ? ['--remote-debugging-port=9222'] : [];
+
+    const proc = spawn(editorCommand, editorArgs, {
+      shell: true,
+      detached: true,
+      windowsHide: false,
+      stdio: 'ignore'
+    });
+    proc.unref();
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Failed to start editor.'
     };
   }
 });
@@ -421,20 +540,40 @@ ipcMain.handle('plugin:start', async (_event, pluginId) => {
     return { ok: true, status: 'running' };
   }
 
-  if (!fs.existsSync(plugin.scriptPath)) {
-    return { ok: false, error: `Plugin script not found: ${plugin.scriptPath}` };
+  const packagedScriptPath = path.join(
+    process.resourcesPath,
+    'app.asar.unpacked',
+    'src',
+    'plugins',
+    path.basename(plugin.scriptPath)
+  );
+  const scriptPath = app.isPackaged && fs.existsSync(packagedScriptPath)
+    ? packagedScriptPath
+    : plugin.scriptPath;
+
+  if (!fs.existsSync(scriptPath)) {
+    return { ok: false, error: `Plugin script not found: ${scriptPath}` };
   }
 
   try {
-    const proc = spawn(process.execPath, [plugin.scriptPath], {
-      cwd: __dirname,
+    const pluginNodePath = app.isPackaged
+      ? path.join(process.resourcesPath, 'app.asar', 'node_modules')
+      : path.join(__dirname, 'node_modules');
+    const nodePathParts = [pluginNodePath];
+    if (process.env.NODE_PATH) {
+      nodePathParts.push(process.env.NODE_PATH);
+    }
+
+    const proc = spawn(process.execPath, [scriptPath], {
+      cwd: app.isPackaged ? process.resourcesPath : __dirname,
       shell: false,
       windowsHide: true,
       detached: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         ...process.env,
-        ELECTRON_RUN_AS_NODE: '1'
+        ELECTRON_RUN_AS_NODE: '1',
+        NODE_PATH: nodePathParts.join(path.delimiter)
       }
     });
 

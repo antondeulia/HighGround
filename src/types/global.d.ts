@@ -47,6 +47,8 @@ declare global {
         terminal?: TerminalProfile
       ) => Promise<InstanceRunResult>;
       openInstanceVsCode?: (instancePath: string, ide?: IdeProfile) => Promise<InstanceRunResult>;
+      closeAllEditors?: (ide?: IdeProfile) => Promise<InstanceRunResult>;
+      startEditor?: (ide?: IdeProfile) => Promise<InstanceRunResult>;
       onInstanceExit?: (handler: (instanceId: string) => void) => () => void;
       startPlugin?: (pluginId: string) => Promise<PluginRunResult>;
       stopPlugin?: (pluginId: string) => Promise<PluginRunResult>;

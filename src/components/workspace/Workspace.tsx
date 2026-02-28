@@ -404,21 +404,21 @@ export function Workspace() {
   async function handleCreateProject() {
     if (!newName.trim() || !newPath.trim()) {
       setCreateError(true);
-      setCreateStatus('Укажи название и путь проекта.');
+      setCreateStatus('Provide project name and path.');
       return;
     }
 
     const result = await createProjectFolder();
     if (!result.ok || !result.folderPath) {
       setCreateError(true);
-      setCreateStatus(result.error || 'Не удалось создать папку проекта.');
+      setCreateStatus(result.error || 'Failed to create project folder.');
       return;
     }
 
     const project = createProject(newName.trim(), result.folderPath, newTags);
     setProjects((prev) => [project, ...prev]);
     setCreateError(false);
-    setCreateStatus(result.existed ? 'Папка уже существовала, проект добавлен.' : 'Папка создана и проект добавлен.');
+    setCreateStatus(result.existed ? 'Folder already existed, project added.' : 'Folder created and project added.');
     setNewName('');
     setNewTags('');
     setCreateOpen(false);
@@ -430,7 +430,7 @@ export function Workspace() {
     const picker = window.electron?.selectFolder;
     if (!picker) {
       setCreateError(true);
-      setCreateStatus('Системный выбор папки недоступен.');
+      setCreateStatus('System folder picker is unavailable.');
       setCreateOpen(true);
       return;
     }
@@ -443,7 +443,7 @@ export function Workspace() {
       }
 
       setNewPath(selectedFolder);
-      setCreateStatus('Папка выбрана. Введи название проекта и теги.');
+      setCreateStatus('Folder selected. Enter project name and tags.');
       setCreateError(false);
       setCreateOpen(true);
     } finally {
@@ -457,7 +457,7 @@ export function Workspace() {
     const picker = window.electron?.selectFolder;
     if (!picker) {
       setCreateInstanceError(true);
-      setCreateInstanceStatus('Системный выбор папки недоступен.');
+      setCreateInstanceStatus('System folder picker is unavailable.');
       setCreateInstanceOpen(true);
       return;
     }
@@ -471,7 +471,7 @@ export function Workspace() {
 
       setNewInstancePath(selectedFolder);
       setCreateInstanceError(false);
-      setCreateInstanceStatus('Папка выбрана. Укажи имя и tag инстанса.');
+      setCreateInstanceStatus('Folder selected. Provide instance name and tag.');
       setCreateInstanceOpen(true);
     } finally {
       setFolderPickerBusy(false);
@@ -482,7 +482,7 @@ export function Workspace() {
     if (!selectedProject || !activeProjectId) return;
     if (!newInstanceName.trim() || !newInstancePath.trim()) {
       setCreateInstanceError(true);
-      setCreateInstanceStatus('Укажи имя инстанса и путь.');
+      setCreateInstanceStatus('Provide instance name and path.');
       return;
     }
 
@@ -495,7 +495,7 @@ export function Workspace() {
 
     if (!result.ok || !result.folderPath) {
       setCreateInstanceError(true);
-      setCreateInstanceStatus(result.error || 'Не удалось создать папку инстанса.');
+      setCreateInstanceStatus(result.error || 'Failed to create instance folder.');
       return;
     }
 
@@ -509,24 +509,10 @@ export function Workspace() {
     );
 
     setCreateInstanceError(false);
-    setCreateInstanceStatus(result.existed ? 'Папка уже существовала, инстанс добавлен.' : 'Инстанс создан.');
+    setCreateInstanceStatus(result.existed ? 'Folder already existed, instance added.' : 'Instance created.');
     setNewInstanceName('');
     setNewInstanceTag('latest');
     setCreateInstanceOpen(false);
-  }
-
-  function handleToggleProjectRun(projectId: string, event: React.MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation();
-    setProjects((prev) =>
-      prev.map((project) => {
-        if (project.id !== projectId || project.instances.length === 0) return project;
-        const [first, ...rest] = project.instances;
-        return {
-          ...project,
-          instances: [{ ...first, running: !first.running }, ...rest]
-        };
-      })
-    );
   }
 
   function handleDeleteProject(projectId: string) {
@@ -538,7 +524,7 @@ export function Workspace() {
     const target = projects.find((project) => project.id === projectId);
     if (!target) return;
 
-    const nextName = window.prompt('Новое имя проекта', target.name);
+    const nextName = window.prompt('New project name', target.name);
     if (!nextName) return;
 
     const trimmed = nextName.trim();
@@ -562,7 +548,7 @@ export function Workspace() {
       void (async () => {
         const result = await window.electron?.stopInstance?.(instance.id);
         if (!result?.ok) {
-          window.alert(result?.error || 'Не удалось остановить инстанс.');
+          window.alert(result?.error || 'Failed to stop instance.');
           return;
         }
 
@@ -583,7 +569,7 @@ export function Workspace() {
 
     void (async () => {
       if (!instance.command.trim()) {
-        window.alert('Укажи команду запуска, например: npm run dev');
+        window.alert('Provide a start command, for example: npm run dev');
         return;
       }
 
@@ -594,7 +580,7 @@ export function Workspace() {
       });
 
       if (!result?.ok) {
-        window.alert(result?.error || 'Не удалось запустить инстанс.');
+        window.alert(result?.error || 'Failed to start instance.');
         return;
       }
 
@@ -655,7 +641,7 @@ export function Workspace() {
       const result = await window.electron?.openInstanceTerminal?.(instance.path, terminal);
 
       if (!result?.ok) {
-        window.alert(result?.error || 'Не удалось открыть терминал.');
+        window.alert(result?.error || 'Failed to open terminal.');
       }
     })();
   }
@@ -671,7 +657,7 @@ export function Workspace() {
       const result = await window.electron?.openInstanceVsCode?.(instance.path, ide);
 
       if (!result?.ok) {
-        window.alert(result?.error || 'Не удалось открыть IDE.');
+        window.alert(result?.error || 'Failed to open IDE.');
       }
     })();
   }
@@ -683,7 +669,7 @@ export function Workspace() {
     const instance = selected?.instances.find((item) => item.id === instanceId);
     if (!instance) return;
 
-    const confirmed = window.confirm(`Удалить инстанс "${instance.name}"?\nЭто действие нельзя отменить.`);
+    const confirmed = window.confirm(`Delete instance "${instance.name}"?\nThis action cannot be undone.`);
     if (!confirmed) return;
 
     setProjects((prev) =>
@@ -819,6 +805,25 @@ export function Workspace() {
     setCreateInstanceOpen(false);
   }
 
+  function handleCloseAllTabs() {
+    if (tabs.length === 0) return;
+
+    const confirmed = window.confirm('Close all tabs?\nThis action cannot be undone.');
+    if (!confirmed) return;
+
+    Object.values(tabOpenTimersRef.current).forEach((timerId) => window.clearTimeout(timerId));
+    Object.values(tabCloseTimersRef.current).forEach((timerId) => window.clearTimeout(timerId));
+    tabOpenTimersRef.current = {};
+    tabCloseTimersRef.current = {};
+
+    setOpeningTabIds([]);
+    setClosingTabIds([]);
+    setTabs([]);
+    setActiveTabId(null);
+    setInstanceSearch('');
+    setCreateInstanceOpen(false);
+  }
+
   function handleBackToProjectsList() {
     const nextTab = createTab();
     setTabs((prev) => [...prev, nextTab]);
@@ -841,21 +846,29 @@ export function Workspace() {
         </div>
         <div className={styles.windowControls}>
           <button className={styles.windowControlButton} type="button" onClick={() => window.electron?.minimizeWindow?.()}>
-            —
+            <img
+              src="/icons/minimize.png"
+              alt=""
+              className={`${styles.windowControlIcon} ${styles.windowControlIconMinimize}`}
+            />
           </button>
           <button
             className={styles.windowControlButton}
             type="button"
             onClick={() => window.electron?.toggleMaximizeWindow?.()}
           >
-            □
+            <img
+              src="/icons/maximize.png"
+              alt=""
+              className={`${styles.windowControlIcon} ${styles.windowControlIconMaximize}`}
+            />
           </button>
           <button
             className={`${styles.windowControlButton} ${styles.windowControlButtonClose}`}
             type="button"
             onClick={() => window.electron?.closeWindow?.()}
           >
-            ×
+            <img src="/icons/close.png" alt="" className={`${styles.windowControlIcon} ${styles.windowControlIconClose}`} />
           </button>
         </div>
       </header>
@@ -873,33 +886,60 @@ export function Workspace() {
         <main className={styles.main}>
           <section className={styles.projectTabsBar} aria-label="Open project tabs">
             <div className={styles.projectTabs}>
-              {tabs.map((tab) => {
+              {tabs.map((tab, index) => {
                 const tabProject = tab.projectId ? projects.find((project) => project.id === tab.projectId) ?? null : null;
-                const tabTitle = tabProject?.name ?? 'Новая вкладка';
+                const tabTitle = tabProject?.name ?? 'New tab';
                 const isOpening = openingTabIds.includes(tab.id);
                 const isClosing = closingTabIds.includes(tab.id);
+                const isActive = tab.id === activeTabId;
+                const isFirst = index === 0;
+                const isLast = index === tabs.length - 1;
+                const nextTab = index < tabs.length - 1 ? tabs[index + 1] : null;
+                const showLeadingDivider = isFirst && !isActive;
+                const showMiddleDivider = Boolean(nextTab) && !isActive && nextTab?.id !== activeTabId;
+                const showTrailingDivider = isLast && !isActive;
                 return (
-                  <div
-                    key={tab.id}
-                    className={`${styles.projectTab} ${activeTabId === tab.id ? styles.projectTabActive : ''} ${isOpening ? styles.projectTabOpening : ''} ${isClosing ? styles.projectTabClosing : ''}`}
-                  >
-                    <button type="button" className={styles.projectTabSelect} onClick={() => handleSelectTab(tab.id)}>
-                      <span className={styles.projectTabName}>{tabTitle}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.projectTabClose}
-                      aria-label={`Close ${tabTitle} tab`}
-                      disabled={isClosing}
-                      onClick={() => handleCloseTab(tab.id)}
+                  <div key={tab.id} className={styles.projectTabItem}>
+                    <span
+                      className={`${styles.projectTabDivider} ${styles.projectTabDividerLeft} ${showLeadingDivider ? styles.projectTabDividerVisible : ''}`}
+                      aria-hidden="true"
+                    />
+                    <div
+                      className={`${styles.projectTab} ${isActive ? styles.projectTabActive : ''} ${isOpening ? styles.projectTabOpening : ''} ${isClosing ? styles.projectTabClosing : ''}`}
                     >
-                      x
-                    </button>
+                      <button type="button" className={styles.projectTabSelect} onClick={() => handleSelectTab(tab.id)}>
+                        <span className={styles.projectTabName}>{tabTitle}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.projectTabClose}
+                        aria-label={`Close ${tabTitle} tab`}
+                        disabled={isClosing}
+                        onClick={() => handleCloseTab(tab.id)}
+                      >
+                        x
+                      </button>
+                    </div>
+                    <span
+                      className={`${styles.projectTabDivider} ${styles.projectTabDividerRight} ${showMiddleDivider || showTrailingDivider ? styles.projectTabDividerVisible : ''}`}
+                      aria-hidden="true"
+                    />
                   </div>
                 );
               })}
               <button type="button" className={styles.projectTabAdd} aria-label="New tab" onClick={handleAddTab}>
                 +
+              </button>
+            </div>
+            <div className={styles.projectTabsActions}>
+              <button
+                type="button"
+                className={styles.projectTabsCloseAll}
+                aria-label="Close all tabs"
+                title="Close all tabs"
+                onClick={handleCloseAllTabs}
+              >
+                ×
               </button>
             </div>
           </section>
@@ -910,7 +950,7 @@ export function Workspace() {
             <section className={styles.pluginsView}>
               <header className={styles.contentHeader}>
                 <h1>Settings</h1>
-                <p>Настройки по умолчанию для новых и не настроенных инстансов.</p>
+                <p>Default settings for new and unconfigured instances.</p>
               </header>
               <div className={styles.settingsPanel}>
                 <label className={styles.fieldLabel}>
@@ -946,7 +986,6 @@ export function Workspace() {
                   void handleCreateClick();
                 }}
                 onOpenProject={handleOpenProject}
-                onToggleProjectRun={handleToggleProjectRun}
                 onDeleteProject={handleDeleteProject}
                 onEditProject={handleEditProject}
               />

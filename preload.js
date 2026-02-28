@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electron', {
   openInstanceTerminal: (instancePath, terminal) =>
     ipcRenderer.invoke('instance:open-terminal', instancePath, terminal),
   openInstanceVsCode: (instancePath, ide) => ipcRenderer.invoke('instance:open-vscode', instancePath, ide),
+  closeAllEditors: (ide) => ipcRenderer.invoke('editor:close-all', ide),
+  startEditor: (ide) => ipcRenderer.invoke('editor:start', ide),
   startPlugin: (pluginId) => ipcRenderer.invoke('plugin:start', pluginId),
   stopPlugin: (pluginId) => ipcRenderer.invoke('plugin:stop', pluginId),
   getPluginStatus: (pluginId) => ipcRenderer.invoke('plugin:status', pluginId),

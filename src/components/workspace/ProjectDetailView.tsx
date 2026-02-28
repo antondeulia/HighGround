@@ -523,7 +523,7 @@ export function ProjectDetailView({
 
       {project.instances.length === 0 ? (
         <section className={styles.instancesEmpty} aria-live="polite">
-          У вас пока что нет инстансов.
+          You don't have any instances yet.
         </section>
       ) : (
         <section className={styles.instancesTableWrap}>
@@ -575,14 +575,14 @@ export function ProjectDetailView({
             }}
           >
             <div className={styles.createHeader}>
-              <h3>Новый инстанс</h3>
+              <h3>New instance</h3>
               <button type="button" className={styles.closeButton} onClick={onCloseCreateInstance}>
                 ×
               </button>
             </div>
 
             <label className={styles.fieldLabel}>
-              <span>Имя инстанса</span>
+              <span>Instance name</span>
               <input
                 value={createInstanceName}
                 placeholder="website-ui-worker"
@@ -592,7 +592,7 @@ export function ProjectDetailView({
             </label>
 
             <label className={styles.fieldLabel}>
-              <span>Выбранная папка</span>
+              <span>Selected folder</span>
               <input value={createInstancePath} readOnly />
             </label>
 
@@ -606,7 +606,7 @@ export function ProjectDetailView({
             </label>
 
             <button type="submit" className={styles.createSubmit}>
-              Создать инстанс
+              Create instance
             </button>
 
             <p className={`${styles.createStatus} ${createInstanceError ? styles.createStatusError : ''}`}>

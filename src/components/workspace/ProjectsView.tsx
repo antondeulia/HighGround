@@ -12,7 +12,6 @@ interface ProjectsViewProps {
   onViewChange: (value: ProjectsViewMode) => void;
   onCreateToggle: () => void;
   onOpenProject: (projectId: string) => void;
-  onToggleProjectRun: (projectId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
   onDeleteProject: (projectId: string) => void;
   onEditProject: (projectId: string) => void;
 }
@@ -25,7 +24,6 @@ export function ProjectsView({
   onViewChange,
   onCreateToggle,
   onOpenProject,
-  onToggleProjectRun,
   onDeleteProject,
   onEditProject
 }: ProjectsViewProps) {
@@ -55,12 +53,16 @@ export function ProjectsView({
           className={styles.searchInput}
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Поиск проекта..."
+          placeholder="Search projects..."
         />
 
         <div className={styles.toolbarRight}>
-          <button className={styles.createButton} type="button" onClick={onCreateToggle}>
-            + Проект
+          <button
+            className={`${styles.createButton} ${styles.projectCreateButton}`}
+            type="button"
+            onClick={onCreateToggle}
+          >
+            + Project
           </button>
 
           <div className={styles.viewSwitch}>
@@ -85,8 +87,8 @@ export function ProjectsView({
       {viewMode === 'cards' ? (
         projects.length === 0 ? (
           <section className={styles.emptyStateCard}>
-            <p className={styles.emptyStateTitle}>У вас пока нет проектов</p>
-            <p className={styles.emptyStateHint}>Нажмите «+ Проект», чтобы добавить первую карточку.</p>
+            <p className={styles.emptyStateTitle}>You don't have any projects yet</p>
+            <p className={styles.emptyStateHint}>Click "+ Project" to add your first project card.</p>
           </section>
         ) : (
           <section className={styles.projectsGrid}>
@@ -164,18 +166,27 @@ export function ProjectsView({
             </thead>
             <tbody>
               {projects.map((project) => {
-                const active = project.instances.find((instance) => instance.running) ?? project.instances[0];
                 return (
                   <tr key={project.id} onClick={() => onOpenProject(project.id)} className={styles.projectsTableRow}>
-                    <td>{project.name}</td>
+                    <td>
+                      <div className={styles.tableNameCell}>
+                        <span className={styles.tableFolderIcon} aria-hidden="true">
+                          📁
+                        </span>
+                        <span>{project.name}</span>
+                      </div>
+                    </td>
                     <td className={styles.projectPath}>{project.path}</td>
                     <td>
                       <button
                         type="button"
-                        className={`${styles.runButton} ${active?.running ? styles.runButtonStop : ''}`}
-                        onClick={(event) => onToggleProjectRun(project.id, event)}
+                        className={`${styles.runButton} ${styles.tableOpenButton}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenProject(project.id);
+                        }}
                       >
-                        {active?.running ? '■ Стоп' : '▶ Запуск'}
+                        Open
                       </button>
                     </td>
                   </tr>
@@ -186,7 +197,7 @@ export function ProjectsView({
         </section>
       )}
 
-      {projects.length === 0 && viewMode === 'table' ? <p className={styles.emptyState}>Ничего не найдено.</p> : null}
+      {projects.length === 0 && viewMode === 'table' ? <p className={styles.emptyState}>Nothing found.</p> : null}
     </section>
   );
 }

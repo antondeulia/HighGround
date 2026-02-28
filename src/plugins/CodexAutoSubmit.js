@@ -59,14 +59,14 @@ async function runOnce() {
 
       await Runtime.enable();
 
-      // подождём чуть-чуть, чтобы набрать contexts
+      // wait a bit to collect contexts
       await new Promise((r) => setTimeout(r, 200));
 
       console.log(
         `\n[CDP] target=${t.id.slice(0, 6)} contexts=${contexts.length}`,
       );
 
-      // если по какой-то причине не пришли события, всё равно попробуем без contextId
+      // if events did not arrive for any reason, still try without contextId
       if (contexts.length === 0) {
         const { result, exceptionDetails } = await Runtime.evaluate({
           expression: CLICK_EXPR,

@@ -48,14 +48,14 @@ export function CreateProjectPanel({
         }}
       >
         <div className={styles.createHeader}>
-          <h3>Новый проект</h3>
+          <h3>New project</h3>
           <button type="button" className={styles.closeButton} onClick={onClose}>
             ×
           </button>
         </div>
 
         <label className={styles.fieldLabel}>
-          <span>Название</span>
+          <span>Name</span>
           <input
             value={name}
             placeholder="api-server"
@@ -65,12 +65,12 @@ export function CreateProjectPanel({
         </label>
 
         <label className={styles.fieldLabel}>
-          <span>Выбранная папка</span>
+          <span>Selected folder</span>
           <input value={path} readOnly />
         </label>
 
         <label className={styles.fieldLabel}>
-          <span>Теги (опционально)</span>
+          <span>Tags (optional)</span>
           <input
             value={tags}
             placeholder="frontend, internal"
@@ -79,7 +79,7 @@ export function CreateProjectPanel({
         </label>
 
         <button type="submit" className={styles.createSubmit}>
-          Создать проект
+          Create project
         </button>
 
         <p className={statusClass}>{statusText}</p>

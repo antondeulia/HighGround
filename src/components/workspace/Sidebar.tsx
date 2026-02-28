@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { ThemeMode } from '@/types/project';
-import styles from './Workspace.module.css';
+import { ThemeMode } from "@/types/project";
+import styles from "./Workspace.module.css";
 
 interface SidebarProps {
   theme: ThemeMode;
   onThemeChange: (theme: ThemeMode) => void;
-  activeSection: 'projects' | 'plugins' | 'settings';
-  onSectionChange: (section: 'projects' | 'plugins' | 'settings') => void;
+  activeSection: "projects" | "plugins" | "settings";
+  onSectionChange: (section: "projects" | "plugins" | "settings") => void;
   isCollapsed: boolean;
   onToggleCollapsed: () => void;
 }
@@ -63,17 +63,17 @@ export function Sidebar({
   activeSection,
   onSectionChange,
   isCollapsed,
-  onToggleCollapsed
+  onToggleCollapsed,
 }: SidebarProps) {
-  const sidebarClass = `${styles.sidebar} ${isCollapsed ? styles.sidebarCollapsed : ''}`;
+  const sidebarClass = `${styles.sidebar} ${isCollapsed ? styles.sidebarCollapsed : ""}`;
 
   return (
     <aside className={sidebarClass}>
       <nav className={styles.menu}>
         <button
-          className={`${styles.menuItem} ${activeSection === 'projects' ? styles.menuItemActive : ''}`}
+          className={`${styles.menuItem} ${activeSection === "projects" ? styles.menuItemActive : ""}`}
           type="button"
-          onClick={() => onSectionChange('projects')}
+          onClick={() => onSectionChange("projects")}
           aria-label="Projects"
         >
           <span className={styles.menuItemIcon}>
@@ -82,9 +82,9 @@ export function Sidebar({
           <span className={styles.menuItemText}>Projects</span>
         </button>
         <button
-          className={`${styles.menuItem} ${activeSection === 'plugins' ? styles.menuItemActive : ''}`}
+          className={`${styles.menuItem} ${activeSection === "plugins" ? styles.menuItemActive : ""}`}
           type="button"
-          onClick={() => onSectionChange('plugins')}
+          onClick={() => onSectionChange("plugins")}
           aria-label="Plugins"
         >
           <span className={styles.menuItemIcon}>
@@ -93,9 +93,9 @@ export function Sidebar({
           <span className={styles.menuItemText}>Plugins</span>
         </button>
         <button
-          className={`${styles.menuItem} ${activeSection === 'settings' ? styles.menuItemActive : ''}`}
+          className={`${styles.menuItem} ${activeSection === "settings" ? styles.menuItemActive : ""}`}
           type="button"
-          onClick={() => onSectionChange('settings')}
+          onClick={() => onSectionChange("settings")}
           aria-label="Settings"
         >
           <span className={styles.menuItemIcon}>
@@ -106,6 +106,19 @@ export function Sidebar({
       </nav>
 
       <div className={styles.sidebarFooter}>
+        <div className={styles.sidebarSupport}>
+          <p className={styles.sidebarSupportText}>
+            Support my unemployed ahh 🙏
+          </p>
+          <a
+            className={styles.sidebarSupportLink}
+            href="https://buymeacoffee.com/antondeulia"
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            Buy me a coffee
+          </a>
+        </div>
         <div className={styles.sidebarFooterControls}>
           <select
             id="theme-select"
@@ -122,10 +135,10 @@ export function Sidebar({
             className={styles.sidebarToggle}
             type="button"
             onClick={onToggleCollapsed}
-            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {isCollapsed ? '»' : '«'}
+            {isCollapsed ? "»" : "«"}
           </button>
         </div>
       </div>

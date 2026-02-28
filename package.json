@@ -1,6 +1,6 @@
 {
   "name": "folder-manager",
-  "version": "2.3.1",
+  "version": "2.3.3",
   "private": false,
   "main": "main.js",
   "scripts": {
@@ -10,7 +10,7 @@
     "start:web": "next start",
     "lint": "next lint",
     "electron:dev": "npm run electron",
-    "electron": "set ELECTRON_RUN_AS_NODE=&& electron .",
+    "electron": "node scripts/run-electron.cjs",
     "dev": "npm run clean:next && next dev",
     "app": "electron .",
     "dist:win": "npm run build && npx electron-builder --win nsis --publish never"
@@ -25,6 +25,7 @@
     "@types/node": "22.10.2",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
+    "cross-env": "^10.1.0",
     "electron": "^37.2.0",
     "electron-builder": "^26.8.1",
     "typescript": "5.7.2",

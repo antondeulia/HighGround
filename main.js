@@ -3,10 +3,15 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const waitOn = require('wait-on');
+const http = require('http');
+const next = require('next');
 
 const NEXT_PORT = Number(process.env.ELECTRON_NEXT_PORT || 3310);
 const APP_URL = `http://localhost:${NEXT_PORT}`;
+const isDev = !app.isPackaged;
 let nextProcess = null;
+let nextServer = null;
+let nextApp = null;
 let mainWindow = null;
 const instanceProcesses = new Map();
 const pluginProcesses = new Map();
@@ -177,15 +182,37 @@ function startNextDevServer() {
   });
 }
 
-async function boot() {
-  startNextDevServer();
+async function startNextProdServer() {
+  if (nextServer) return;
 
-  await waitOn({
-    resources: [APP_URL],
-    timeout: 120000,
-    interval: 250,
-    validateStatus: (status) => status >= 200 && status < 500
+  const appDir = app.getAppPath();
+  nextApp = next({
+    dev: false,
+    dir: appDir
   });
+
+  await nextApp.prepare();
+  const handle = nextApp.getRequestHandler();
+
+  await new Promise((resolve, reject) => {
+    nextServer = http.createServer((req, res) => handle(req, res));
+    nextServer.on('error', reject);
+    nextServer.listen(NEXT_PORT, '127.0.0.1', () => resolve());
+  });
+}
+
+async function boot() {
+  if (isDev) {
+    startNextDevServer();
+    await waitOn({
+      resources: [APP_URL],
+      timeout: 120000,
+      interval: 250,
+      validateStatus: (status) => status >= 200 && status < 500
+    });
+  } else {
+    await startNextProdServer();
+  }
 
   createWindow();
 }
@@ -205,6 +232,15 @@ app.on('before-quit', () => {
   if (nextProcess) {
     nextProcess.kill();
     nextProcess = null;
+  }
+
+  if (nextServer) {
+    nextServer.close();
+    nextServer = null;
+  }
+
+  if (nextApp) {
+    nextApp = null;
   }
 });
 
@@ -389,9 +425,10 @@ ipcMain.handle('plugin:start', async (_event, pluginId) => {
   try {
     const proc = spawn('node', [plugin.scriptPath], {
       cwd: __dirname,
-      shell: true,
+      shell: false,
       windowsHide: true,
-      detached: true,
+      detached: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
       env: process.env
     });
 

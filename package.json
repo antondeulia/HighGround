@@ -1,7 +1,7 @@
 {
   "name": "folder-manager",
   "version": "2.0.0",
-  "private": true,
+  "private": false,
   "main": "main.js",
   "scripts": {
     "build": "next build",
@@ -11,7 +11,8 @@
     "electron:dev": "npm run electron",
     "electron": "set ELECTRON_RUN_AS_NODE=&& electron .",
     "dev": "next dev",
-    "app": "electron ."
+    "app": "electron .",
+    "dist:win": "npm run build && electron-builder --win nsis --publish never"
   },
   "dependencies": {
     "next": "14.2.18",
@@ -23,7 +24,41 @@
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "electron": "^37.2.0",
+    "electron-builder": "^26.0.12",
     "typescript": "5.7.2",
     "wait-on": "^8.0.3"
+  },
+  "build": {
+    "appId": "com.foldermanager.desktop",
+    "productName": "Folder Manager",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      ".next/**/*",
+      "public/**/*",
+      "src/plugins/**/*"
+    ],
+    "asarUnpack": [
+      "src/plugins/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

@@ -2,7 +2,7 @@ const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const waitOn = require('wait-on');
+let waitOn = null;
 const http = require('http');
 const next = require('next');
 
@@ -204,11 +204,14 @@ async function startNextProdServer() {
 async function boot() {
   if (isDev) {
     startNextDevServer();
+    if (!waitOn) {
+      waitOn = require('wait-on');
+    }
     await waitOn({
       resources: [APP_URL],
       timeout: 120000,
       interval: 250,
-      validateStatus: (status) => status >= 200 && status < 500
+      validateStatus: (status) => status >= 200 && status < 300
     });
   } else {
     await startNextProdServer();
@@ -423,13 +426,16 @@ ipcMain.handle('plugin:start', async (_event, pluginId) => {
   }
 
   try {
-    const proc = spawn('node', [plugin.scriptPath], {
+    const proc = spawn(process.execPath, [plugin.scriptPath], {
       cwd: __dirname,
       shell: false,
       windowsHide: true,
       detached: false,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: process.env
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1'
+      }
     });
 
     const entry = { process: proc, stopping: false };

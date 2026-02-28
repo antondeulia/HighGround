@@ -1,18 +1,19 @@
 {
   "name": "folder-manager",
-  "version": "2.0.0",
+  "version": "2.3.0",
   "private": false,
   "main": "main.js",
   "scripts": {
-    "build": "next build",
+    "clean:next": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
+    "build": "npm run clean:next && next build",
     "start": "npm run electron:dev",
     "start:web": "next start",
     "lint": "next lint",
     "electron:dev": "npm run electron",
     "electron": "set ELECTRON_RUN_AS_NODE=&& electron .",
-    "dev": "next dev",
+    "dev": "npm run clean:next && next dev",
     "app": "electron .",
-    "dist:win": "npm run build && electron-builder --win nsis --publish never"
+    "dist:win": "npm run build && npx electron-builder --win nsis --publish never"
   },
   "dependencies": {
     "next": "14.2.18",
@@ -24,7 +25,7 @@
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "electron": "^37.2.0",
-    "electron-builder": "^26.0.12",
+    "electron-builder": "^26.8.1",
     "typescript": "5.7.2",
     "wait-on": "^8.0.3"
   },

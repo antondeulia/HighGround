@@ -220,14 +220,24 @@ function createTray() {
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Open',
+      label: 'Open HighGround',
       click: () => showMainWindow()
+    },
+    {
+      label: 'About',
+      click: () => {
+        void dialog.showMessageBox({
+          type: 'info',
+          title: 'About HighGround',
+          message: 'HighGround'
+        });
+      }
     },
     {
       type: 'separator'
     },
     {
-      label: 'Exit',
+      label: 'Exit HighGround',
       click: () => {
         isQuitting = true;
         app.quit();

@@ -1048,11 +1048,14 @@
 .emptyStateCard {
   margin-top: 14px;
   min-height: 220px;
-  border: 1px dashed var(--line);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--bg-panel) 85%, var(--bg-main) 15%);
-  display: grid;
-  place-items: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
   text-align: center;
   padding: 20px;
 }
@@ -1065,7 +1068,7 @@
 }
 
 .emptyStateHint {
-  margin: 6px 0 0;
+  margin: 0;
   font-size: 0.88rem;
   color: var(--text-soft);
 }
@@ -1862,6 +1865,31 @@
 
 .pluginCloseEditorsButton:hover {
   background: color-mix(in srgb, #0a2450 92%, #ffffff 8%);
+}
+
+.pluginVsCodeButton {
+  min-width: 112px;
+  border-radius: 6px;
+  background: color-mix(in srgb, #1f7aff 92%, #ffffff 8%);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pluginVsCodeButton:hover {
+  background: color-mix(in srgb, #1766d3 94%, #ffffff 6%);
+}
+
+.pluginVsCodeButton:disabled {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.pluginVsCodeButtonIcon {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
 }
 
 .pluginStopButton {

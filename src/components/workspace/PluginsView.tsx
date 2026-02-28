@@ -192,6 +192,7 @@ export function PluginsView() {
   );
   const [busyPluginId, setBusyPluginId] = useState<string | null>(null);
   const [closingEditors, setClosingEditors] = useState(false);
+  const [startingVsCode, setStartingVsCode] = useState(false);
   const [logs, setLogs] = useState<Record<string, PluginLogEntry[]>>({});
   const [error, setError] = useState("");
 
@@ -306,6 +307,20 @@ export function PluginsView() {
       }
     } finally {
       setClosingEditors(false);
+    }
+  }
+
+  async function handleStartEditor(ide: "vscode" | "cursor" = "vscode") {
+    if (startingVsCode) return;
+    setStartingVsCode(true);
+    setError("");
+    try {
+      const result = await window.electron?.startEditor?.(ide);
+      if (!result?.ok) {
+        setError(result?.error || "Failed to start editor.");
+      }
+    } finally {
+      setStartingVsCode(false);
     }
   }
 
@@ -444,6 +459,38 @@ export function PluginsView() {
                       ? "Closing VS Code..."
                       : "Close All VS Code instances"}
                   </button>
+                  <button
+                    type="button"
+                    className={`${styles.createButton} ${styles.pluginVsCodeButton}`}
+                    onClick={() => {
+                      void handleStartEditor("vscode");
+                    }}
+                    disabled={startingVsCode}
+                    title="Open VS Code (remote debugging port 9222)"
+                    aria-label="Open VS Code on debugging port 9222"
+                  >
+                    <img
+                      src="/icons/vscode-logo.png"
+                      alt=""
+                      aria-hidden="true"
+                      className={styles.pluginVsCodeButtonIcon}
+                    />
+                    {startingVsCode ? "Opening..." : "VS Code"}
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.createButton} ${selectedPluginStatus === "running" ? styles.pluginStopButton : styles.pluginStartButton} ${styles.pluginActionRight}`}
+                    onClick={() => {
+                      void handleToggle(selectedPlugin.id);
+                    }}
+                    disabled={busyPluginId === selectedPlugin.id}
+                  >
+                    {busyPluginId === selectedPlugin.id
+                      ? "Working..."
+                      : selectedPluginStatus === "running"
+                        ? "Stop"
+                        : "Start"}
+                  </button>
                 </>
               ) : null}
               {activeTab === "logs" ? (
@@ -455,20 +502,22 @@ export function PluginsView() {
                   Clear logs
                 </button>
               ) : null}
-              <button
-                type="button"
-                className={`${styles.createButton} ${selectedPluginStatus === "running" ? styles.pluginStopButton : styles.pluginStartButton}`}
-                onClick={() => {
-                  void handleToggle(selectedPlugin.id);
-                }}
-                disabled={busyPluginId === selectedPlugin.id}
-              >
-                {busyPluginId === selectedPlugin.id
-                  ? "Working..."
-                  : selectedPluginStatus === "running"
-                    ? "Stop"
-                    : "Start"}
-              </button>
+              {selectedPlugin.id !== "codex-auto-submit" ? (
+                <button
+                  type="button"
+                  className={`${styles.createButton} ${selectedPluginStatus === "running" ? styles.pluginStopButton : styles.pluginStartButton}`}
+                  onClick={() => {
+                    void handleToggle(selectedPlugin.id);
+                  }}
+                  disabled={busyPluginId === selectedPlugin.id}
+                >
+                  {busyPluginId === selectedPlugin.id
+                    ? "Working..."
+                    : selectedPluginStatus === "running"
+                      ? "Stop"
+                      : "Start"}
+                </button>
+              ) : null}
             </div>
 
             <div className={styles.pluginTabs}>

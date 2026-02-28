@@ -4,7 +4,7 @@
   display: flex;
   flex-direction: column;
   --topbar-height: 40px;
-  --sidebar-width: 250px;
+  --sidebar-width: 228px;
   --bg-main: #edf1f7;
   --bg-panel: #ffffff;
   --bg-control: #ffffff;
@@ -76,9 +76,15 @@
 }
 
 .workspaceBody {
-  min-height: calc(100vh - var(--topbar-height));
+  height: calc(100vh - var(--topbar-height));
+  min-height: 0;
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
+  transition: grid-template-columns 0.18s ease;
+}
+
+.workspaceBodySidebarCollapsed {
+  --sidebar-width: 72px;
 }
 
 .themeWhite {
@@ -138,9 +144,31 @@
 .sidebar {
   background: var(--sidebar-bg);
   border-right: 1px solid var(--sidebar-line);
-  padding: 16px 14px;
+  padding: 14px 10px;
   display: flex;
   flex-direction: column;
+  transition: padding 0.18s ease;
+}
+
+.sidebarCollapsed {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.sidebarToggle {
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--sidebar-line) 82%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sidebar-text);
+  cursor: pointer;
+  line-height: 1;
+  font-size: 0.95rem;
+}
+
+.sidebarToggle:hover {
+  background: color-mix(in srgb, var(--sidebar-text) 12%, transparent);
 }
 
 .brandIcon {
@@ -169,6 +197,10 @@
   padding: 10px 12px;
   font-size: 0.95rem;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background-color 0.18s ease, color 0.18s ease, padding 0.18s ease;
 }
 
 .menuItemActive {
@@ -176,74 +208,185 @@
   background: rgba(255, 255, 255, 0.12);
 }
 
+.menuItemIcon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menuItemIcon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.menuItemText {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 130px;
+  opacity: 1;
+  transform: translateX(0);
+  transition: max-width 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+}
+
+.sidebarCollapsed .menuItem {
+  justify-content: center;
+  padding: 10px 8px;
+}
+
+.sidebarCollapsed .menuItemText {
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(-6px);
+}
+
 .sidebarFooter {
   margin-top: auto;
   display: grid;
-  gap: 6px;
+  gap: 0;
 }
 
-.themeLabel {
-  font-size: 0.75rem;
-  color: var(--sidebar-text);
+.sidebarFooterControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition: gap 0.18s ease, justify-content 0.18s ease;
 }
 
 .themeSelect {
-  border: 1px solid var(--sidebar-line);
+  border: 0;
   border-radius: 10px;
   background: transparent;
-  color: var(--sidebar-title);
-  padding: 8px 10px;
+  color: var(--sidebar-text);
+  padding: 8px 4px;
+  width: 100%;
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+  min-width: 0;
+  flex: 1;
+  opacity: 1;
+  transition: opacity 0.18s ease, width 0.18s ease, flex-basis 0.18s ease, padding 0.18s ease;
+}
+
+.sidebarFooterControls .sidebarToggle {
+  flex: 0 0 auto;
+}
+
+.sidebarCollapsed .themeSelect {
+  font-size: 0;
+  padding: 8px 2px;
+  text-align: center;
+  flex: 0 0 0;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebarCollapsed .themeSelect option {
+  font-size: 0.9rem;
+}
+
+.sidebarCollapsed .sidebarFooterControls {
+  justify-content: center;
 }
 
 .main {
   background: var(--bg-main);
-  padding: 24px;
+  padding: 14px 24px 24px;
   color: var(--text);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
 }
 
 .projectTabsBar {
-  height: 36px;
+  height: 34px;
   border-bottom: 1px solid var(--line);
   display: flex;
-  align-items: stretch;
-  background: color-mix(in srgb, var(--bg-main) 86%, var(--bg-panel) 14%);
-  margin: -10px -24px 14px;
+  align-items: center;
+  background: color-mix(in srgb, var(--bg-main) 90%, var(--bg-panel) 10%);
+  margin: -14px -24px 18px;
 }
 
 .projectTabs {
   flex: 1;
+  min-width: 0;
   display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  overflow-x: auto;
-  padding: 5px 14px 0 24px;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  padding: 4px 12px 4px 20px;
 }
 
 .projectTab {
-  min-width: 120px;
-  max-width: 260px;
+  flex: 1 1 150px;
+  min-width: 0;
+  max-width: 240px;
   display: inline-flex;
-  align-items: stretch;
-  border: 1px solid var(--line);
-  border-bottom: 0;
-  border-radius: 8px 8px 0 0;
-  background: color-mix(in srgb, var(--bg-panel) 68%, var(--bg-main) 32%);
+  align-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  overflow: hidden;
+  transform-origin: left center;
+  will-change: transform, opacity, max-width;
+  transition: background-color 0.18s ease, transform 0.18s ease, opacity 0.18s ease, max-width 0.18s ease,
+    margin 0.18s ease;
+}
+
+.projectTabOpening {
+  animation: projectTabIn 0.18s ease;
+}
+
+.projectTabClosing {
+  flex: 0 0 0;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.97);
+  max-width: 0;
+  min-width: 0;
+  margin-left: 0;
+  margin-right: 0;
+  pointer-events: none;
+}
+
+@keyframes projectTabIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .projectTabActive {
-  background: var(--bg-panel);
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--line) 55%);
-  border-bottom-color: var(--bg-main);
+  background: color-mix(in srgb, var(--text-soft) 12%, transparent);
+}
+
+.projectTab:hover,
+.projectTab:focus-within {
+  background: color-mix(in srgb, var(--text-soft) 10%, transparent);
 }
 
 .projectTabSelect {
+  flex: 1 1 auto;
   min-width: 0;
   border: 0;
   background: transparent;
   color: var(--text-soft);
-  padding: 6px 10px;
+  padding: 5px 10px 5px 12px;
   cursor: pointer;
+  outline: none;
+  border-radius: 10px;
 }
 
 .projectTabActive .projectTabSelect {
@@ -258,37 +401,52 @@
 }
 
 .projectTabClose {
-  width: 24px;
+  width: 22px;
+  height: 22px;
+  margin-right: 4px;
   border: 0;
-  border-left: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: 50%;
   background: transparent;
   color: var(--text-soft);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   line-height: 1;
   cursor: pointer;
+  outline: none;
 }
 
-.projectTabSelect:hover,
-.projectTabClose:hover {
-  background: color-mix(in srgb, var(--text-soft) 12%, transparent);
+.projectTabSelect:focus-visible,
+.projectTabSelect:active {
+  background: transparent;
+}
+
+.projectTabClose:hover,
+.projectTabClose:focus-visible {
+  background: color-mix(in srgb, var(--text-soft) 20%, transparent);
 }
 
 .projectTabAdd {
-  width: 28px;
-  min-width: 28px;
-  height: 28px;
-  border: 1px solid var(--line);
-  border-bottom: 0;
-  border-radius: 8px 8px 0 0;
-  background: color-mix(in srgb, var(--bg-panel) 72%, var(--bg-main) 28%);
+  flex: 0 0 auto;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
   color: var(--text-soft);
-  font-size: 1rem;
+  font-size: 0.95rem;
   line-height: 1;
   cursor: pointer;
+  outline: none;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 .projectTabAdd:hover {
   background: color-mix(in srgb, var(--text-soft) 12%, transparent);
+  color: var(--text);
+}
+
+.projectTabAdd:focus-visible {
+  background: color-mix(in srgb, var(--text-soft) 14%, transparent);
   color: var(--text);
 }
 
@@ -320,6 +478,7 @@
   background: var(--bg-control);
   color: var(--text);
   padding: 8px 10px;
+  outline: none;
 }
 
 .toolbarRight {
@@ -329,9 +488,9 @@
 }
 
 .createButton {
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--bg-control);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
   padding: 8px 10px;
   cursor: pointer;
@@ -658,11 +817,15 @@
 }
 
 .instancesTable th:nth-child(5) {
-  width: 250px;
+  width: 220px;
 }
 
 .instancesTable th:nth-child(6) {
-  width: 320px;
+  width: 210px;
+}
+
+.instancesTable th:nth-child(7) {
+  width: 180px;
 }
 
 .projectsTableRow {
@@ -738,9 +901,9 @@
 }
 
 .backButton {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--bg-control);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
   padding: 9px 14px;
   cursor: pointer;
@@ -782,10 +945,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  padding: 0 10px;
-  background: var(--bg-control);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0 2px;
+  background: transparent;
 }
 
 .instanceSearchInput {
@@ -861,23 +1025,37 @@
 .instancePathCell {
   width: 132px;
   max-width: 132px;
+  overflow: visible !important;
+  position: relative;
+  z-index: 3;
 }
 
 .instancePathInner {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+}
+
+.pathTooltipWrap {
+  flex: 1;
+  min-width: 0;
+  display: block;
 }
 
 .instancePathText {
   min-width: 0;
-  max-width: 86px;
+  max-width: 100%;
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .pathTextButton {
+  display: block;
+  width: 100%;
+  min-width: 0;
   border: 0;
   background: transparent;
   color: var(--text);
@@ -885,7 +1063,34 @@
   margin: 0;
   text-align: left;
   cursor: pointer;
-  max-width: 86px;
+  max-width: 100%;
+}
+
+.pathTooltipWrap::before {
+  left: 0;
+  transform: translateX(0) translateY(4px);
+  max-width: 520px;
+  white-space: normal;
+  word-break: break-all;
+  z-index: 100;
+}
+
+.pathTooltipWrap::after {
+  left: 12px;
+  transform: translateX(0) translateY(4px) rotate(45deg);
+  z-index: 99;
+}
+
+.pathTooltipWrap:hover::before,
+.pathTooltipWrap:focus-within::before,
+.pathTooltipWrap.tooltipVisible::before {
+  transform: translateX(0) translateY(0);
+}
+
+.pathTooltipWrap:hover::after,
+.pathTooltipWrap:focus-within::after,
+.pathTooltipWrap.tooltipVisible::after {
+  transform: translateX(0) translateY(0) rotate(45deg);
 }
 
 .instanceActions {
@@ -899,9 +1104,11 @@
 }
 
 .instanceActionsCell {
-  min-width: 170px;
+  width: 180px;
+  min-width: 180px;
   text-align: right !important;
   position: relative;
+  overflow: visible !important;
 }
 
 .instanceInlineInput {
@@ -917,20 +1124,68 @@
 }
 
 .commandRunGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  min-width: 0;
+  max-width: 100%;
+  width: auto;
+}
+
+.commandRunGroup .inlineEditableField {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: calc(100% - 32px);
+  padding: 0;
+}
+
+.inlineEditableField {
+  width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  gap: 6px;
+  padding: 6px 8px;
+}
+
+.inlineFieldText {
+  display: block;
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
-  min-width: 260px;
-  max-width: 300px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+.inlineEditButton {
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.instanceRow:hover .inlineEditButton,
+.inlineEditableField:hover .inlineEditButton,
+.inlineEditableField:focus-within .inlineEditButton {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .commandRunButton {
   flex: 0 0 auto;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border: 0;
   border-left: 0;
   border-radius: 0;
@@ -1155,28 +1410,30 @@
 }
 
 .instanceUrlCell {
-  width: 250px;
+  width: 220px;
+  min-width: 220px;
 }
 
 .instanceUrlInput {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
   background: transparent;
   color: var(--text);
-  padding: 6px 8px;
+  padding: 0;
   font-size: 0.8rem;
   outline: none;
 }
 
 .instanceUrlInput:focus {
-  border-color: color-mix(in srgb, var(--accent) 60%, var(--line) 40%);
+  border-color: transparent;
 }
 
 .instanceCommandCell {
-  width: 320px;
-  max-width: 320px;
+  width: 210px;
+  max-width: 210px;
+  min-width: 210px;
 }
 
 .instanceSelectCell {
@@ -1236,17 +1493,75 @@
 }
 
 .pluginsView {
-  display: grid;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
+  overflow: hidden;
 }
 
-.pluginCard {
+.pluginsList {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 320px));
+  justify-content: flex-start;
+  align-content: start;
+  gap: 10px;
+}
+
+.pluginListCard {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--bg-panel);
-  padding: 16px;
+  padding: 14px 16px;
   display: grid;
-  gap: 14px;
+  gap: 12px;
+  align-content: start;
+  min-height: 150px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.pluginListCard:hover {
+  border-color: color-mix(in srgb, var(--line) 70%, var(--accent) 30%);
+  box-shadow: 0 10px 22px rgba(16, 22, 36, 0.1);
+  transform: translateY(-1px);
+}
+
+.pluginDetailPage {
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.pluginBackRow {
+  display: flex;
+  align-items: center;
+}
+
+.pluginBackButton {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  padding: 0 0 6px;
+  cursor: pointer;
+}
+
+.pluginBackButton:hover {
+  color: var(--text);
 }
 
 .pluginHeader {
@@ -1261,10 +1576,27 @@
   font-size: 1.1rem;
 }
 
+.pluginHeadContent {
+  min-width: 0;
+}
+
+.pluginDetailHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
 .pluginDescription {
   margin: 6px 0 0;
   color: var(--text-soft);
   font-size: 0.88rem;
+}
+
+.pluginDescriptionClamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .pluginStatus {
@@ -1274,6 +1606,7 @@
   font-size: 0.74rem;
   color: var(--text-soft);
   background: var(--bg-control);
+  white-space: nowrap;
 }
 
 .pluginStatus[data-state='running'] {
@@ -1285,6 +1618,7 @@
 .pluginActions {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -1299,27 +1633,92 @@
 }
 
 .pluginInstructionBlock {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: color-mix(in srgb, var(--bg-panel) 82%, var(--bg-main) 18%);
   padding: 12px;
 }
 
-.pluginInstructionBlock h3 {
-  margin: 0;
-  font-size: 0.9rem;
+.pluginTabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
 }
 
-.pluginInstructionBlock ol {
-  margin: 8px 0 0 18px;
-  padding: 0;
-  display: grid;
-  gap: 4px;
+.pluginTabButton {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-control);
   color: var(--text-soft);
-  font-size: 0.83rem;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.pluginTabButtonActive {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line) 55%);
+  background: color-mix(in srgb, var(--accent-soft) 72%, transparent);
+  color: var(--accent);
+}
+
+.pluginTabPanel {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pluginMarkdown {
+  display: grid;
+  gap: 8px;
+}
+
+.pluginMdTitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.pluginMdSubtitle {
+  margin: 6px 0 0;
+  font-size: 0.86rem;
+  color: var(--text);
+}
+
+.pluginMdParagraph {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+
+.pluginMdList,
+.pluginMdBulletList {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 5px;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+}
+
+.pluginInlineCode {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.79rem;
+  padding: 1px 5px;
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  background: color-mix(in srgb, var(--bg-main) 36%, transparent);
 }
 
 .pluginLogsWrap {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--line);
   border-radius: 10px;
   overflow: hidden;
@@ -1345,7 +1744,8 @@
 }
 
 .pluginLogs {
-  max-height: 280px;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 10px;
   display: grid;
@@ -1363,6 +1763,44 @@
 
 .pluginLogLine span {
   color: var(--text-soft);
+}
+
+.pluginSettingsPanel {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--bg-panel) 88%, var(--bg-main) 12%);
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.pluginSettingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  padding-bottom: 9px;
+  font-size: 0.84rem;
+  color: var(--text-soft);
+}
+
+.pluginSettingRow:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.pluginSettingRow input[type='text'] {
+  width: 170px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-control);
+  color: var(--text);
+  padding: 6px 8px;
 }
 
 

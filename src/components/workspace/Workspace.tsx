@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Project, ProjectsViewMode, ThemeMode } from '@/types/project';
 import { createInstance, createProject } from './project-factory';
 import { Sidebar } from './Sidebar';
@@ -27,6 +27,34 @@ interface WorkspaceTab {
 }
 
 const PROJECTS_STORAGE_KEY = 'folder-manager.projects.v1';
+const WORKSPACE_STORAGE_KEY = 'folder-manager.workspace.v1';
+const TAB_ANIMATION_MS = 180;
+
+interface WorkspacePersistedState {
+  theme?: ThemeMode;
+  activeSection?: WorkspaceSection;
+  isSidebarCollapsed?: boolean;
+  viewMode?: ProjectsViewMode;
+  tabs?: WorkspaceTab[];
+  activeTabId?: string | null;
+  search?: string;
+  instanceSearch?: string;
+  filtersOpen?: boolean;
+  statusFilter?: 'all' | 'running' | 'stopped';
+  tagFilter?: string;
+  createDraft?: {
+    name?: string;
+    path?: string;
+    tags?: string;
+  };
+  createInstanceDraft?: {
+    name?: string;
+    tag?: string;
+    path?: string;
+  };
+  terminalProfiles?: Record<string, TerminalProfile>;
+  ideProfiles?: Record<string, IdeProfile>;
+}
 
 function createTab(projectId: string | null = null): WorkspaceTab {
   const tabId =
@@ -46,7 +74,7 @@ function normalizeProjects(rawProjects: Project[]): Project[] {
           localUrl:
             typeof instance.localUrl === 'string' && instance.localUrl.trim().length > 0
               ? instance.localUrl
-              : 'http://localhost:${PORT}',
+              : '',
           command: typeof instance.command === 'string' ? instance.command : 'npm run dev',
           running: false
         }))
@@ -54,18 +82,87 @@ function normalizeProjects(rawProjects: Project[]): Project[] {
   }));
 }
 
+function sanitizeWorkspaceState(raw: unknown): WorkspacePersistedState {
+  if (!raw || typeof raw !== 'object') {
+    return {};
+  }
+
+  const state = raw as WorkspacePersistedState;
+  const safeTheme: ThemeMode | undefined =
+    state.theme === 'white' || state.theme === 'hybrid' || state.theme === 'dark' ? state.theme : undefined;
+  const safeSection: WorkspaceSection | undefined =
+    state.activeSection === 'projects' || state.activeSection === 'plugins' || state.activeSection === 'settings'
+      ? state.activeSection
+      : undefined;
+  const safeView: ProjectsViewMode | undefined =
+    state.viewMode === 'cards' || state.viewMode === 'table' ? state.viewMode : undefined;
+  const safeStatus: 'all' | 'running' | 'stopped' | undefined =
+    state.statusFilter === 'all' || state.statusFilter === 'running' || state.statusFilter === 'stopped'
+      ? state.statusFilter
+      : undefined;
+  const safeTabs = Array.isArray(state.tabs)
+    ? state.tabs.filter((tab): tab is WorkspaceTab => {
+        return (
+          Boolean(tab) &&
+          typeof tab.id === 'string' &&
+          (typeof tab.projectId === 'string' || tab.projectId === null)
+        );
+      })
+    : undefined;
+
+  return {
+    theme: safeTheme,
+    activeSection: safeSection,
+    isSidebarCollapsed: typeof state.isSidebarCollapsed === 'boolean' ? state.isSidebarCollapsed : undefined,
+    viewMode: safeView,
+    tabs: safeTabs,
+    activeTabId: typeof state.activeTabId === 'string' || state.activeTabId === null ? state.activeTabId : undefined,
+    search: typeof state.search === 'string' ? state.search : undefined,
+    instanceSearch: typeof state.instanceSearch === 'string' ? state.instanceSearch : undefined,
+    filtersOpen: typeof state.filtersOpen === 'boolean' ? state.filtersOpen : undefined,
+    statusFilter: safeStatus,
+    tagFilter: typeof state.tagFilter === 'string' ? state.tagFilter : undefined,
+    createDraft:
+      state.createDraft && typeof state.createDraft === 'object'
+        ? {
+            name: typeof state.createDraft.name === 'string' ? state.createDraft.name : undefined,
+            path: typeof state.createDraft.path === 'string' ? state.createDraft.path : undefined,
+            tags: typeof state.createDraft.tags === 'string' ? state.createDraft.tags : undefined
+          }
+        : undefined,
+    createInstanceDraft:
+      state.createInstanceDraft && typeof state.createInstanceDraft === 'object'
+        ? {
+            name: typeof state.createInstanceDraft.name === 'string' ? state.createInstanceDraft.name : undefined,
+            tag: typeof state.createInstanceDraft.tag === 'string' ? state.createInstanceDraft.tag : undefined,
+            path: typeof state.createInstanceDraft.path === 'string' ? state.createInstanceDraft.path : undefined
+          }
+        : undefined,
+    terminalProfiles:
+      state.terminalProfiles && typeof state.terminalProfiles === 'object'
+        ? state.terminalProfiles
+        : undefined,
+    ideProfiles: state.ideProfiles && typeof state.ideProfiles === 'object' ? state.ideProfiles : undefined
+  };
+}
+
 export function Workspace() {
   const [theme, setTheme] = useState<ThemeMode>('hybrid');
   const [activeSection, setActiveSection] = useState<WorkspaceSection>('projects');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<ProjectsViewMode>('cards');
   const [projects, setProjects] = useState<Project[]>([]);
   const [tabs, setTabs] = useState<WorkspaceTab[]>(() => [createTab()]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [openingTabIds, setOpeningTabIds] = useState<string[]>([]);
+  const [closingTabIds, setClosingTabIds] = useState<string[]>([]);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
 
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all');
   const [instanceSearch, setInstanceSearch] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'stopped'>('all');
+  const [tagFilter, setTagFilter] = useState('all');
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -80,6 +177,11 @@ export function Workspace() {
   const [createInstanceStatus, setCreateInstanceStatus] = useState('');
   const [createInstanceError, setCreateInstanceError] = useState(false);
   const [folderPickerBusy, setFolderPickerBusy] = useState(false);
+  const [terminalProfiles, setTerminalProfiles] = useState<Record<string, TerminalProfile>>({});
+  const [ideProfiles, setIdeProfiles] = useState<Record<string, IdeProfile>>({});
+  const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
+  const tabOpenTimersRef = useRef<Record<string, number>>({});
+  const tabCloseTimersRef = useRef<Record<string, number>>({});
 
   const activeTab = useMemo(() => tabs.find((tab) => tab.id === activeTabId) ?? null, [tabs, activeTabId]);
   const activeProjectId = activeTab?.projectId ?? null;
@@ -91,12 +193,11 @@ export function Workspace() {
 
   const filteredProjects = useMemo(() => {
     return projects.filter((project) => {
-      const byFilter = filter === 'all' || project.category === filter;
       const hay = `${project.name} ${project.path}`.toLowerCase();
       const bySearch = hay.includes(search.toLowerCase());
-      return byFilter && bySearch;
+      return bySearch;
     });
-  }, [projects, filter, search]);
+  }, [projects, search]);
 
   useEffect(() => {
     try {
@@ -120,15 +221,114 @@ export function Workspace() {
   }, []);
 
   useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+
+      const parsed = sanitizeWorkspaceState(JSON.parse(raw));
+
+      if (parsed.theme) setTheme(parsed.theme);
+      if (parsed.activeSection) setActiveSection(parsed.activeSection);
+      if (typeof parsed.isSidebarCollapsed === 'boolean') setIsSidebarCollapsed(parsed.isSidebarCollapsed);
+      if (parsed.viewMode) setViewMode(parsed.viewMode);
+      if (Array.isArray(parsed.tabs) && parsed.tabs.length > 0) setTabs(parsed.tabs);
+      if (typeof parsed.activeTabId !== 'undefined') setActiveTabId(parsed.activeTabId);
+      if (typeof parsed.search === 'string') setSearch(parsed.search);
+      if (typeof parsed.instanceSearch === 'string') setInstanceSearch(parsed.instanceSearch);
+      if (typeof parsed.filtersOpen === 'boolean') setFiltersOpen(parsed.filtersOpen);
+      if (parsed.statusFilter) setStatusFilter(parsed.statusFilter);
+      if (typeof parsed.tagFilter === 'string') setTagFilter(parsed.tagFilter);
+      if (parsed.createDraft) {
+        if (typeof parsed.createDraft.name === 'string') setNewName(parsed.createDraft.name);
+        if (typeof parsed.createDraft.path === 'string' && parsed.createDraft.path.trim().length > 0) {
+          setNewPath(parsed.createDraft.path);
+        }
+        if (typeof parsed.createDraft.tags === 'string') setNewTags(parsed.createDraft.tags);
+      }
+      if (parsed.createInstanceDraft) {
+        if (typeof parsed.createInstanceDraft.name === 'string') setNewInstanceName(parsed.createInstanceDraft.name);
+        if (typeof parsed.createInstanceDraft.tag === 'string') setNewInstanceTag(parsed.createInstanceDraft.tag);
+        if (typeof parsed.createInstanceDraft.path === 'string') setNewInstancePath(parsed.createInstanceDraft.path);
+      }
+      if (parsed.terminalProfiles) setTerminalProfiles(parsed.terminalProfiles);
+      if (parsed.ideProfiles) setIdeProfiles(parsed.ideProfiles);
+    } catch {
+      // Ignore invalid workspace snapshot and use defaults.
+    } finally {
+      setWorkspaceLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!projectsLoaded) return;
     window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
   }, [projects, projectsLoaded]);
 
   useEffect(() => {
+    if (!workspaceLoaded) return;
+
+    const nextState: WorkspacePersistedState = {
+      theme,
+      activeSection,
+      isSidebarCollapsed,
+      viewMode,
+      tabs,
+      activeTabId,
+      search,
+      instanceSearch,
+      filtersOpen,
+      statusFilter,
+      tagFilter,
+      createDraft: {
+        name: newName,
+        path: newPath,
+        tags: newTags
+      },
+      createInstanceDraft: {
+        name: newInstanceName,
+        tag: newInstanceTag,
+        path: newInstancePath
+      },
+      terminalProfiles,
+      ideProfiles
+    };
+
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(nextState));
+  }, [
+    theme,
+    activeSection,
+    isSidebarCollapsed,
+    viewMode,
+    tabs,
+    activeTabId,
+    search,
+    instanceSearch,
+    filtersOpen,
+    statusFilter,
+    tagFilter,
+    newName,
+    newPath,
+    newTags,
+    newInstanceName,
+    newInstanceTag,
+    newInstancePath,
+    terminalProfiles,
+    ideProfiles,
+    workspaceLoaded
+  ]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(tabOpenTimersRef.current).forEach((timerId) => window.clearTimeout(timerId));
+      Object.values(tabCloseTimersRef.current).forEach((timerId) => window.clearTimeout(timerId));
+    };
+  }, []);
+
+  useEffect(() => {
     if (tabs.length === 0) {
-      const fallback = createTab();
-      setTabs([fallback]);
-      setActiveTabId(fallback.id);
+      setActiveTabId(null);
       return;
     }
 
@@ -144,6 +344,20 @@ export function Workspace() {
         return { ...tab, projectId: null };
       })
     );
+
+    const existingInstanceIds = new Set(projects.flatMap((project) => project.instances.map((instance) => instance.id)));
+    setTerminalProfiles((prev) => {
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([instanceId]) => existingInstanceIds.has(instanceId))
+      ) as Record<string, TerminalProfile>;
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+    setIdeProfiles((prev) => {
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([instanceId]) => existingInstanceIds.has(instanceId))
+      ) as Record<string, IdeProfile>;
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
   }, [projects]);
 
   useEffect(() => {
@@ -457,6 +671,26 @@ export function Workspace() {
         };
       })
     );
+    setTerminalProfiles((prev) => {
+      if (!(instanceId in prev)) return prev;
+      const next = { ...prev };
+      delete next[instanceId];
+      return next;
+    });
+    setIdeProfiles((prev) => {
+      if (!(instanceId in prev)) return prev;
+      const next = { ...prev };
+      delete next[instanceId];
+      return next;
+    });
+  }
+
+  function handleTerminalProfileChange(instanceId: string, terminal: TerminalProfile) {
+    setTerminalProfiles((prev) => ({ ...prev, [instanceId]: terminal }));
+  }
+
+  function handleIdeProfileChange(instanceId: string, ide: IdeProfile) {
+    setIdeProfiles((prev) => ({ ...prev, [instanceId]: ide }));
   }
 
   useEffect(() => {
@@ -479,10 +713,16 @@ export function Workspace() {
   function handleOpenProject(projectId: string) {
     setActiveSection('projects');
     setTabs((prev) => {
-      if (!activeTabId || !prev.some((tab) => tab.id === activeTabId)) {
+      if (prev.length === 0) {
         const nextTab = createTab(projectId);
         setActiveTabId(nextTab.id);
-        return [...prev, nextTab];
+        return [nextTab];
+      }
+
+      if (!activeTabId || !prev.some((tab) => tab.id === activeTabId)) {
+        const firstTabId = prev[0].id;
+        setActiveTabId(firstTabId);
+        return prev.map((tab, index) => (index === 0 ? { ...tab, projectId } : tab));
       }
 
       return prev.map((tab) => (tab.id === activeTabId ? { ...tab, projectId } : tab));
@@ -498,22 +738,49 @@ export function Workspace() {
     setCreateInstanceOpen(false);
   }
 
+  function scheduleOpeningTabAnimation(tabId: string) {
+    setOpeningTabIds((prev) => (prev.includes(tabId) ? prev : [...prev, tabId]));
+
+    if (tabOpenTimersRef.current[tabId]) {
+      window.clearTimeout(tabOpenTimersRef.current[tabId]);
+    }
+
+    tabOpenTimersRef.current[tabId] = window.setTimeout(() => {
+      setOpeningTabIds((prev) => prev.filter((id) => id !== tabId));
+      delete tabOpenTimersRef.current[tabId];
+    }, TAB_ANIMATION_MS);
+  }
+
   function handleCloseTab(tabId: string) {
-    setTabs((prev) => {
-      const removedIndex = prev.findIndex((tab) => tab.id === tabId);
-      if (removedIndex === -1) return prev;
+    if (closingTabIds.includes(tabId)) return;
+    setClosingTabIds((prev) => [...prev, tabId]);
 
-      if (prev.length === 1) {
-        return [{ ...prev[0], projectId: null }];
-      }
+    if (tabCloseTimersRef.current[tabId]) {
+      window.clearTimeout(tabCloseTimersRef.current[tabId]);
+    }
 
-      const next = prev.filter((tab) => tab.id !== tabId);
-      if (activeTabId === tabId) {
-        const nextIndex = Math.min(removedIndex, next.length - 1);
-        setActiveTabId(next[nextIndex].id);
-      }
-      return next;
-    });
+    tabCloseTimersRef.current[tabId] = window.setTimeout(() => {
+      setTabs((prev) => {
+        const removedIndex = prev.findIndex((tab) => tab.id === tabId);
+        if (removedIndex === -1) {
+          return prev;
+        }
+
+        const next = prev.filter((tab) => tab.id !== tabId);
+        setActiveTabId((currentActiveTabId) => {
+          if (currentActiveTabId !== tabId) return currentActiveTabId;
+          if (next.length === 0) return null;
+          const nextIndex = Math.min(removedIndex, next.length - 1);
+          return next[nextIndex].id;
+        });
+
+        return next;
+      });
+
+      setClosingTabIds((prev) => prev.filter((id) => id !== tabId));
+      delete tabCloseTimersRef.current[tabId];
+    }, TAB_ANIMATION_MS);
+
     setInstanceSearch('');
     setCreateInstanceOpen(false);
   }
@@ -522,19 +789,24 @@ export function Workspace() {
     const nextTab = createTab();
     setTabs((prev) => [...prev, nextTab]);
     setActiveTabId(nextTab.id);
+    scheduleOpeningTabAnimation(nextTab.id);
     setActiveSection('projects');
     setInstanceSearch('');
     setCreateInstanceOpen(false);
   }
 
   function handleBackToProjectsList() {
-    if (!activeTabId) return;
-    setTabs((prev) => prev.map((tab) => (tab.id === activeTabId ? { ...tab, projectId: null } : tab)));
+    const nextTab = createTab();
+    setTabs((prev) => [...prev, nextTab]);
+    setActiveTabId(nextTab.id);
+    scheduleOpeningTabAnimation(nextTab.id);
+    setActiveSection('projects');
     setInstanceSearch('');
     setCreateInstanceOpen(false);
   }
 
   const rootClass = `${styles.workspace} ${styles[`theme${theme[0].toUpperCase()}${theme.slice(1)}`]}`;
+  const workspaceBodyClass = `${styles.workspaceBody} ${isSidebarCollapsed ? styles.workspaceBodySidebarCollapsed : ''}`;
 
   return (
     <div className={rootClass}>
@@ -564,12 +836,14 @@ export function Workspace() {
         </div>
       </header>
 
-      <div className={styles.workspaceBody}>
+      <div className={workspaceBodyClass}>
         <Sidebar
           theme={theme}
           onThemeChange={setTheme}
           activeSection={activeSection}
           onSectionChange={setActiveSection}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapsed={() => setIsSidebarCollapsed((prev) => !prev)}
         />
 
         <main className={styles.main}>
@@ -578,8 +852,13 @@ export function Workspace() {
               {tabs.map((tab) => {
                 const tabProject = tab.projectId ? projects.find((project) => project.id === tab.projectId) ?? null : null;
                 const tabTitle = tabProject?.name ?? 'Новая вкладка';
+                const isOpening = openingTabIds.includes(tab.id);
+                const isClosing = closingTabIds.includes(tab.id);
                 return (
-                  <div key={tab.id} className={`${styles.projectTab} ${activeTabId === tab.id ? styles.projectTabActive : ''}`}>
+                  <div
+                    key={tab.id}
+                    className={`${styles.projectTab} ${activeTabId === tab.id ? styles.projectTabActive : ''} ${isOpening ? styles.projectTabOpening : ''} ${isClosing ? styles.projectTabClosing : ''}`}
+                  >
                     <button type="button" className={styles.projectTabSelect} onClick={() => handleSelectTab(tab.id)}>
                       <span className={styles.projectTabName}>{tabTitle}</span>
                     </button>
@@ -587,6 +866,7 @@ export function Workspace() {
                       type="button"
                       className={styles.projectTabClose}
                       aria-label={`Close ${tabTitle} tab`}
+                      disabled={isClosing}
                       onClick={() => handleCloseTab(tab.id)}
                     >
                       x
@@ -614,10 +894,8 @@ export function Workspace() {
               <ProjectsView
                 viewMode={viewMode}
                 search={search}
-                filter={filter}
                 projects={filteredProjects}
                 onSearchChange={setSearch}
-                onFilterChange={setFilter}
                 onViewChange={setViewMode}
                 onCreateToggle={() => {
                   void handleCreateClick();
@@ -645,6 +923,11 @@ export function Workspace() {
             <ProjectDetailView
               project={selectedProject}
               instanceSearch={instanceSearch}
+              filtersOpen={filtersOpen}
+              statusFilter={statusFilter}
+              tagFilter={tagFilter}
+              terminalProfiles={terminalProfiles}
+              ideProfiles={ideProfiles}
               createInstanceOpen={createInstanceOpen}
               createInstanceName={newInstanceName}
               createInstanceTag={newInstanceTag}
@@ -653,6 +936,11 @@ export function Workspace() {
               createInstanceError={createInstanceError}
               onBack={handleBackToProjectsList}
               onInstanceSearchChange={setInstanceSearch}
+              onFiltersOpenChange={setFiltersOpen}
+              onStatusFilterChange={setStatusFilter}
+              onTagFilterChange={setTagFilter}
+              onTerminalProfileChange={handleTerminalProfileChange}
+              onIdeProfileChange={handleIdeProfileChange}
               onToggleInstanceRun={handleToggleInstanceRun}
               onDeleteInstance={handleDeleteInstance}
               onUpdateInstanceLocalUrl={handleUpdateInstanceLocalUrl}

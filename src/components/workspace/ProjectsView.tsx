@@ -7,10 +7,8 @@ import styles from './Workspace.module.css';
 interface ProjectsViewProps {
   viewMode: ProjectsViewMode;
   search: string;
-  filter: string;
   projects: Project[];
   onSearchChange: (value: string) => void;
-  onFilterChange: (value: string) => void;
   onViewChange: (value: ProjectsViewMode) => void;
   onCreateToggle: () => void;
   onOpenProject: (projectId: string) => void;
@@ -22,10 +20,8 @@ interface ProjectsViewProps {
 export function ProjectsView({
   viewMode,
   search,
-  filter,
   projects,
   onSearchChange,
-  onFilterChange,
   onViewChange,
   onCreateToggle,
   onOpenProject,
@@ -52,7 +48,6 @@ export function ProjectsView({
     <section>
       <header className={styles.contentHeader}>
         <h1>Projects</h1>
-        <p>Компонентный Next.js workspace с поиском и фильтрацией.</p>
       </header>
 
       <section className={styles.toolbar}>
@@ -83,19 +78,6 @@ export function ProjectsView({
             >
               ☰
             </button>
-          </div>
-
-          <div className={styles.filterGroup}>
-            {['all', 'frontend', 'backend', 'infra'].map((value) => (
-              <button
-                key={value}
-                type="button"
-                className={`${styles.filterButton} ${filter === value ? styles.filterButtonActive : ''}`}
-                onClick={() => onFilterChange(value)}
-              >
-                {value}
-              </button>
-            ))}
           </div>
         </div>
       </section>

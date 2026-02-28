@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Instance, Project } from '@/types/project';
 import styles from './Workspace.module.css';
 
@@ -11,6 +11,11 @@ type ActiveMenu = { instanceId: string; kind: 'terminal' | 'ide' } | null;
 interface ProjectDetailViewProps {
   project: Project;
   instanceSearch: string;
+  filtersOpen: boolean;
+  statusFilter: 'all' | 'running' | 'stopped';
+  tagFilter: string;
+  terminalProfiles: Record<string, TerminalProfile>;
+  ideProfiles: Record<string, IdeProfile>;
   createInstanceOpen: boolean;
   createInstanceName: string;
   createInstanceTag: string;
@@ -19,6 +24,11 @@ interface ProjectDetailViewProps {
   createInstanceError: boolean;
   onBack: () => void;
   onInstanceSearchChange: (value: string) => void;
+  onFiltersOpenChange: (value: boolean) => void;
+  onStatusFilterChange: (value: 'all' | 'running' | 'stopped') => void;
+  onTagFilterChange: (value: string) => void;
+  onTerminalProfileChange: (instanceId: string, value: TerminalProfile) => void;
+  onIdeProfileChange: (instanceId: string, value: IdeProfile) => void;
   onToggleInstanceRun: (instanceId: string) => void;
   onDeleteInstance: (instanceId: string) => void;
   onUpdateInstanceLocalUrl: (instanceId: string, localUrl: string) => void;
@@ -45,6 +55,10 @@ function InstanceRow({
   onUpdateCommand,
   onOpenTerminal,
   onOpenVsCode,
+  terminalProfile,
+  ideProfile,
+  onTerminalProfileChange,
+  onIdeProfileChange,
   activeMenu,
   onToggleMenu,
   onCloseMenus
@@ -56,13 +70,17 @@ function InstanceRow({
   onUpdateCommand: (instanceId: string, command: string) => void;
   onOpenTerminal: (instanceId: string, terminal: TerminalProfile) => void;
   onOpenVsCode: (instanceId: string, ide: IdeProfile) => void;
+  terminalProfile: TerminalProfile;
+  ideProfile: IdeProfile;
+  onTerminalProfileChange: (instanceId: string, value: TerminalProfile) => void;
+  onIdeProfileChange: (instanceId: string, value: IdeProfile) => void;
   activeMenu: ActiveMenu;
   onToggleMenu: (instanceId: string, kind: 'terminal' | 'ide') => void;
   onCloseMenus: () => void;
 }) {
-  const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>('git-bash');
-  const [ideProfile, setIdeProfile] = useState<IdeProfile>('vscode');
+  const rowRef = useRef<HTMLTableRowElement>(null);
   const [pathTooltipVisible, setPathTooltipVisible] = useState(false);
+  const [editingField, setEditingField] = useState<'localUrl' | 'command' | null>(null);
   const terminalMenuOpen = activeMenu?.instanceId === instance.id && activeMenu.kind === 'terminal';
   const ideMenuOpen = activeMenu?.instanceId === instance.id && activeMenu.kind === 'ide';
 
@@ -71,6 +89,20 @@ function InstanceRow({
     const timeout = window.setTimeout(() => setPathTooltipVisible(false), 2200);
     return () => window.clearTimeout(timeout);
   }, [pathTooltipVisible]);
+
+  useEffect(() => {
+    if (!editingField) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (rowRef.current?.contains(target)) return;
+      setEditingField(null);
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [editingField]);
 
   async function handleCopyPath(event: React.MouseEvent<HTMLButtonElement>) {
     event.stopPropagation();
@@ -82,7 +114,7 @@ function InstanceRow({
   }
 
   return (
-    <tr className={styles.instanceRow}>
+    <tr className={styles.instanceRow} ref={rowRef}>
       <td className={styles.instanceSelectCell}>
         <input type="checkbox" className={styles.instanceCheckbox} />
       </td>
@@ -93,7 +125,9 @@ function InstanceRow({
       <td className={styles.instancePathCell}>
         <div className={styles.instancePathInner}>
           <span
-            className={`${styles.tooltipWrap} ${pathTooltipVisible ? styles.tooltipVisible : ''}`}
+            className={`${styles.tooltipWrap} ${styles.pathTooltipWrap} ${
+              pathTooltipVisible ? styles.tooltipVisible : ''
+            }`}
             data-tooltip={instance.path}
           >
             <button
@@ -117,23 +151,69 @@ function InstanceRow({
         </div>
       </td>
       <td className={styles.instanceUrlCell}>
-        <input
-          type="text"
-          value={instance.localUrl}
-          onChange={(event) => onUpdateLocalUrl(instance.id, event.target.value)}
-          placeholder="http://localhost:${PORT}"
-          className={styles.instanceUrlInput}
-        />
+        <div className={styles.inlineEditableField}>
+          {editingField === 'localUrl' ? (
+            <input
+              type="text"
+              value={instance.localUrl}
+              onChange={(event) => onUpdateLocalUrl(instance.id, event.target.value)}
+              placeholder="http://localhost:..."
+              className={styles.instanceUrlInput}
+              autoFocus
+              onBlur={() => setEditingField((current) => (current === 'localUrl' ? null : current))}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === 'Escape') {
+                  event.currentTarget.blur();
+                }
+              }}
+            />
+          ) : (
+            <>
+              <span className={styles.inlineFieldText}>{instance.localUrl || 'http://localhost:...'}</span>
+              <button
+                type="button"
+                className={styles.inlineEditButton}
+                onClick={() => setEditingField('localUrl')}
+                aria-label={`Edit local URL for ${instance.name}`}
+              >
+                ✎
+              </button>
+            </>
+          )}
+        </div>
       </td>
       <td className={styles.instanceCommandCell}>
         <div className={styles.commandRunGroup}>
-          <input
-            type="text"
-            value={instance.command}
-            onChange={(event) => onUpdateCommand(instance.id, event.target.value)}
-            placeholder="npm run dev"
-            className={styles.instanceInlineInput}
-          />
+          <div className={styles.inlineEditableField}>
+            {editingField === 'command' ? (
+              <input
+                type="text"
+                value={instance.command}
+                onChange={(event) => onUpdateCommand(instance.id, event.target.value)}
+                placeholder="npm run dev"
+                className={styles.instanceInlineInput}
+                autoFocus
+                onBlur={() => setEditingField((current) => (current === 'command' ? null : current))}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === 'Escape') {
+                    event.currentTarget.blur();
+                  }
+                }}
+              />
+            ) : (
+              <>
+                <span className={styles.inlineFieldText}>{instance.command || 'npm run dev'}</span>
+                <button
+                  type="button"
+                  className={styles.inlineEditButton}
+                  onClick={() => setEditingField('command')}
+                  aria-label={`Edit command for ${instance.name}`}
+                >
+                  ✎
+                </button>
+              </>
+            )}
+          </div>
           <span className={styles.tooltipWrap} data-tooltip={instance.running ? 'Stop instance' : 'Run command'}>
             <button
               type="button"
@@ -183,7 +263,7 @@ function InstanceRow({
                   <button
                     type="button"
                     onClick={() => {
-                      setTerminalProfile('git-bash');
+                      onTerminalProfileChange(instance.id, 'git-bash');
                       onCloseMenus();
                     }}
                   >
@@ -193,7 +273,7 @@ function InstanceRow({
                   <button
                     type="button"
                     onClick={() => {
-                      setTerminalProfile('powershell');
+                      onTerminalProfileChange(instance.id, 'powershell');
                       onCloseMenus();
                     }}
                   >
@@ -206,7 +286,7 @@ function InstanceRow({
                   <button
                     type="button"
                     onClick={() => {
-                      setTerminalProfile('cmd');
+                      onTerminalProfileChange(instance.id, 'cmd');
                       onCloseMenus();
                     }}
                   >
@@ -249,7 +329,7 @@ function InstanceRow({
                   <button
                     type="button"
                     onClick={() => {
-                      setIdeProfile('vscode');
+                      onIdeProfileChange(instance.id, 'vscode');
                       onCloseMenus();
                     }}
                   >
@@ -259,7 +339,7 @@ function InstanceRow({
                   <button
                     type="button"
                     onClick={() => {
-                      setIdeProfile('cursor');
+                      onIdeProfileChange(instance.id, 'cursor');
                       onCloseMenus();
                     }}
                   >
@@ -290,6 +370,11 @@ function InstanceRow({
 export function ProjectDetailView({
   project,
   instanceSearch,
+  filtersOpen,
+  statusFilter,
+  tagFilter,
+  terminalProfiles,
+  ideProfiles,
   createInstanceOpen,
   createInstanceName,
   createInstanceTag,
@@ -298,6 +383,11 @@ export function ProjectDetailView({
   createInstanceError,
   onBack,
   onInstanceSearchChange,
+  onFiltersOpenChange,
+  onStatusFilterChange,
+  onTagFilterChange,
+  onTerminalProfileChange,
+  onIdeProfileChange,
   onToggleInstanceRun,
   onDeleteInstance,
   onUpdateInstanceLocalUrl,
@@ -310,9 +400,6 @@ export function ProjectDetailView({
   onCloseCreateInstance,
   onSubmitCreateInstance
 }: ProjectDetailViewProps) {
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'stopped'>('all');
-  const [tagFilter, setTagFilter] = useState('all');
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
 
   useEffect(() => {
@@ -341,6 +428,12 @@ export function ProjectDetailView({
     const unique = Array.from(new Set(project.instances.map((instance) => instance.tag)));
     return ['all', ...unique];
   }, [project.instances]);
+
+  useEffect(() => {
+    if (!tags.includes(tagFilter)) {
+      onTagFilterChange('all');
+    }
+  }, [tags, tagFilter, onTagFilterChange]);
 
   const filteredInstances = project.instances.filter((instance) => {
     const target = `${instance.name} ${instance.path} ${instance.tag}`.toLowerCase();
@@ -384,7 +477,7 @@ export function ProjectDetailView({
             <button
               type="button"
               className={styles.iconButton}
-              onClick={() => setFiltersOpen((prev) => !prev)}
+              onClick={() => onFiltersOpenChange(!filtersOpen)}
               aria-label="Filters"
             >
               ☰
@@ -396,9 +489,7 @@ export function ProjectDetailView({
                   <span>Status</span>
                   <select
                     value={statusFilter}
-                    onChange={(event) =>
-                      setStatusFilter(event.target.value as 'all' | 'running' | 'stopped')
-                    }
+                    onChange={(event) => onStatusFilterChange(event.target.value as 'all' | 'running' | 'stopped')}
                   >
                     <option value="all">All</option>
                     <option value="running">Running</option>
@@ -408,7 +499,7 @@ export function ProjectDetailView({
 
                 <label className={styles.fieldLabel}>
                   <span>Tag</span>
-                  <select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}>
+                  <select value={tagFilter} onChange={(event) => onTagFilterChange(event.target.value)}>
                     {tags.map((tag) => (
                       <option key={tag} value={tag}>
                         {tag}
@@ -455,6 +546,10 @@ export function ProjectDetailView({
                   onUpdateCommand={onUpdateInstanceCommand}
                   onOpenTerminal={onOpenInstanceTerminal}
                   onOpenVsCode={onOpenInstanceVsCode}
+                  terminalProfile={terminalProfiles[instance.id] ?? 'git-bash'}
+                  ideProfile={ideProfiles[instance.id] ?? 'vscode'}
+                  onTerminalProfileChange={onTerminalProfileChange}
+                  onIdeProfileChange={onIdeProfileChange}
                   activeMenu={activeMenu}
                   onToggleMenu={handleToggleMenu}
                   onCloseMenus={() => setActiveMenu(null)}

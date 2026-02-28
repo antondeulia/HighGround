@@ -1,3 +1,7 @@
+P.s during installing windows will warn you this app may contain some danger, ngl I dont wanna spend some few hundreds of $ for signature so you gotta trust me 😭🙏 (Will appreciate your star by the way (if it works for you), thanks!)
+
+28.02.2026 (Update): I found out that there is no issue with auto-submitting codex-approvals in Linux and Mac OS, so this plugin (Codex Auto-Submit) will only stay on Windows (which is logical, and still very useful :) )
+
 # HighGround
 
 A desktop app for managing IDE instances.

@@ -206,14 +206,6 @@ app.on('before-quit', () => {
     nextProcess.kill();
     nextProcess = null;
   }
-
-  for (const instanceId of instanceProcesses.keys()) {
-    stopInstanceProcess(instanceId);
-  }
-
-  for (const pluginId of pluginProcesses.keys()) {
-    stopPluginProcess(pluginId);
-  }
 });
 
 ipcMain.handle('dialog:select-folder', async (_event, defaultPath) => {
@@ -326,9 +318,10 @@ ipcMain.handle('instance:start', async (_event, payload) => {
     const proc = spawn(launch.file, launch.args, {
       cwd: instancePath,
       windowsHide: false,
-      detached: false,
+      detached: true,
       stdio: 'ignore'
     });
+    proc.unref();
 
     instanceProcesses.set(instanceId, { process: proc });
 
@@ -398,7 +391,7 @@ ipcMain.handle('plugin:start', async (_event, pluginId) => {
       cwd: __dirname,
       shell: true,
       windowsHide: true,
-      detached: false,
+      detached: true,
       env: process.env
     });
 

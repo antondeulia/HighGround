@@ -54,6 +54,8 @@ interface WorkspacePersistedState {
   };
   terminalProfiles?: Record<string, TerminalProfile>;
   ideProfiles?: Record<string, IdeProfile>;
+  defaultTerminal?: TerminalProfile;
+  defaultIde?: IdeProfile;
 }
 
 function createTab(projectId: string | null = null): WorkspaceTab {
@@ -142,7 +144,14 @@ function sanitizeWorkspaceState(raw: unknown): WorkspacePersistedState {
       state.terminalProfiles && typeof state.terminalProfiles === 'object'
         ? state.terminalProfiles
         : undefined,
-    ideProfiles: state.ideProfiles && typeof state.ideProfiles === 'object' ? state.ideProfiles : undefined
+    ideProfiles: state.ideProfiles && typeof state.ideProfiles === 'object' ? state.ideProfiles : undefined,
+    defaultTerminal:
+      state.defaultTerminal === 'git-bash' ||
+      state.defaultTerminal === 'powershell' ||
+      state.defaultTerminal === 'cmd'
+        ? state.defaultTerminal
+        : undefined,
+    defaultIde: state.defaultIde === 'vscode' || state.defaultIde === 'cursor' ? state.defaultIde : undefined
   };
 }
 
@@ -179,6 +188,8 @@ export function Workspace() {
   const [folderPickerBusy, setFolderPickerBusy] = useState(false);
   const [terminalProfiles, setTerminalProfiles] = useState<Record<string, TerminalProfile>>({});
   const [ideProfiles, setIdeProfiles] = useState<Record<string, IdeProfile>>({});
+  const [defaultTerminal, setDefaultTerminal] = useState<TerminalProfile>('git-bash');
+  const [defaultIde, setDefaultIde] = useState<IdeProfile>('vscode');
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
   const tabOpenTimersRef = useRef<Record<string, number>>({});
   const tabCloseTimersRef = useRef<Record<string, number>>({});
@@ -254,6 +265,8 @@ export function Workspace() {
       }
       if (parsed.terminalProfiles) setTerminalProfiles(parsed.terminalProfiles);
       if (parsed.ideProfiles) setIdeProfiles(parsed.ideProfiles);
+      if (parsed.defaultTerminal) setDefaultTerminal(parsed.defaultTerminal);
+      if (parsed.defaultIde) setDefaultIde(parsed.defaultIde);
     } catch {
       // Ignore invalid workspace snapshot and use defaults.
     } finally {
@@ -292,7 +305,9 @@ export function Workspace() {
         path: newInstancePath
       },
       terminalProfiles,
-      ideProfiles
+      ideProfiles,
+      defaultTerminal,
+      defaultIde
     };
 
     window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(nextState));
@@ -316,6 +331,8 @@ export function Workspace() {
     newInstancePath,
     terminalProfiles,
     ideProfiles,
+    defaultTerminal,
+    defaultIde,
     workspaceLoaded
   ]);
 
@@ -662,6 +679,13 @@ export function Workspace() {
   function handleDeleteInstance(instanceId: string) {
     if (!activeProjectId) return;
 
+    const selected = projects.find((project) => project.id === activeProjectId);
+    const instance = selected?.instances.find((item) => item.id === instanceId);
+    if (!instance) return;
+
+    const confirmed = window.confirm(`Удалить инстанс "${instance.name}"?\nЭто действие нельзя отменить.`);
+    if (!confirmed) return;
+
     setProjects((prev) =>
       prev.map((project) => {
         if (project.id !== activeProjectId) return project;
@@ -886,8 +910,29 @@ export function Workspace() {
             <section className={styles.pluginsView}>
               <header className={styles.contentHeader}>
                 <h1>Settings</h1>
-                <p>Раздел в разработке.</p>
+                <p>Настройки по умолчанию для новых и не настроенных инстансов.</p>
               </header>
+              <div className={styles.settingsPanel}>
+                <label className={styles.fieldLabel}>
+                  <span>Default terminal</span>
+                  <select
+                    value={defaultTerminal}
+                    onChange={(event) => setDefaultTerminal(event.target.value as TerminalProfile)}
+                  >
+                    <option value="git-bash">Git Bash</option>
+                    <option value="powershell">PowerShell</option>
+                    <option value="cmd">CMD</option>
+                  </select>
+                </label>
+
+                <label className={styles.fieldLabel}>
+                  <span>Default IDE</span>
+                  <select value={defaultIde} onChange={(event) => setDefaultIde(event.target.value as IdeProfile)}>
+                    <option value="vscode">VS Code</option>
+                    <option value="cursor">Cursor</option>
+                  </select>
+                </label>
+              </div>
             </section>
           ) : !selectedProject ? (
             <>
@@ -954,6 +999,8 @@ export function Workspace() {
               onCreateInstanceTagChange={setNewInstanceTag}
               onCloseCreateInstance={() => setCreateInstanceOpen(false)}
               onSubmitCreateInstance={handleCreateInstanceSubmit}
+              defaultTerminal={defaultTerminal}
+              defaultIde={defaultIde}
             />
           )}
         </main>

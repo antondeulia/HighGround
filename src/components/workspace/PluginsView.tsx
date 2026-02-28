@@ -249,70 +249,72 @@ export function PluginsView() {
 
   return (
     <section className={styles.pluginsView}>
-      <header className={styles.contentHeader}>
-        <h1>Plugins</h1>
-        <p>Utilities and automations for project workflows.</p>
-      </header>
-
       {!selectedPlugin ? (
-        <div className={styles.pluginsList}>
-          {PLUGINS.map((plugin) => (
-            <article
-              key={plugin.id}
-              className={styles.pluginListCard}
-              role="button"
-              tabIndex={0}
-              onClick={() => openPlugin(plugin.id)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  openPlugin(plugin.id);
-                }
-              }}
-            >
-              <div className={styles.pluginHeader}>
-                <div className={styles.pluginHeadContent}>
-                  <h2>{plugin.name}</h2>
-                  <p className={`${styles.pluginDescription} ${styles.pluginDescriptionClamp}`}>{plugin.shortDescription}</p>
-                </div>
-                <span className={styles.pluginStatus} data-state={status}>
-                  {statusLabel}
-                </span>
-              </div>
+        <>
+          <header className={styles.contentHeader}>
+            <h1>Plugins</h1>
+            <p>Utilities and automations for project workflows.</p>
+          </header>
 
-              <div className={styles.pluginActions}>
-                <button
-                  type="button"
-                  className={`${styles.createButton} ${status === 'running' ? styles.pluginStopButton : styles.pluginStartButton}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void handleToggle(plugin.id);
-                  }}
-                  disabled={busyPluginId === plugin.id}
-                >
-                  {busyPluginId === plugin.id ? 'Working...' : status === 'running' ? 'Stop' : 'Start'}
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
+          <div className={styles.pluginsList}>
+            {PLUGINS.map((plugin) => (
+              <article
+                key={plugin.id}
+                className={styles.pluginListCard}
+                role="button"
+                tabIndex={0}
+                onClick={() => openPlugin(plugin.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openPlugin(plugin.id);
+                  }
+                }}
+              >
+                <div className={styles.pluginHeader}>
+                  <div className={styles.pluginHeadContent}>
+                    <h2>{plugin.name}</h2>
+                    <p className={`${styles.pluginDescription} ${styles.pluginDescriptionClamp}`}>{plugin.shortDescription}</p>
+                  </div>
+                  <span className={styles.pluginStatus} data-state={status}>
+                    {statusLabel}
+                  </span>
+                </div>
+
+                <div className={styles.pluginActions}>
+                  <button
+                    type="button"
+                    className={`${styles.createButton} ${status === 'running' ? styles.pluginStopButton : styles.pluginStartButton}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void handleToggle(plugin.id);
+                    }}
+                    disabled={busyPluginId === plugin.id}
+                  >
+                    {busyPluginId === plugin.id ? 'Working...' : status === 'running' ? 'Stop' : 'Start'}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </>
       ) : (
         <>
           <div className={styles.pluginBackRow}>
             <button type="button" className={styles.pluginBackButton} onClick={() => setSelectedPluginId(null)}>
               Back to plugins
             </button>
+            <span className={styles.pluginStatusPlain} data-state={status}>
+              <span className={styles.pluginStatusDot} />
+              {statusLabel}
+            </span>
           </div>
 
           <article className={styles.pluginDetailPage}>
           <div className={styles.pluginDetailHeader}>
             <div className={styles.pluginHeadContent}>
               <h2>{selectedPlugin.name}</h2>
-              <p className={styles.pluginDescription}>{selectedPlugin.shortDescription}</p>
             </div>
-            <span className={styles.pluginStatus} data-state={status}>
-              {statusLabel}
-            </span>
           </div>
 
           <div className={styles.pluginActions}>

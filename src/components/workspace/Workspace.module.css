@@ -17,9 +17,9 @@
   --sidebar-line: #252d3f;
   --sidebar-text: #a2afc9;
   --sidebar-title: #ffffff;
-  --topbar-bg: linear-gradient(180deg, #0f2f82 0%, #0d286d 100%);
+  --topbar-bg: #edf1f7;
   --topbar-shadow: none;
-  --topbar-text: #f0f6ff;
+  --topbar-text: #1c2333;
 }
 
 .topBar {
@@ -100,9 +100,9 @@
   --sidebar-line: #edf0f5;
   --sidebar-text: #55606f;
   --sidebar-title: #1f4f99;
-  --topbar-bg: #f8fbff;
-  --topbar-shadow: 0 2px 0 #dde6f4;
-  --topbar-text: #1f3f7a;
+  --topbar-bg: #ffffff;
+  --topbar-shadow: none;
+  --topbar-text: #1c2333;
 }
 
 .themeHybrid {
@@ -118,8 +118,8 @@
   --sidebar-line: #252d3f;
   --sidebar-text: #a2afc9;
   --sidebar-title: #ffffff;
-  --topbar-bg: #ffffff;
-  --topbar-shadow: 0 4px 0 #cfd7e6;
+  --topbar-bg: #edf1f7;
+  --topbar-shadow: none;
   --topbar-text: #1c2333;
 }
 
@@ -136,9 +136,9 @@
   --sidebar-line: #1f283a;
   --sidebar-text: #8ea0c6;
   --sidebar-title: #f3f7ff;
-  --topbar-bg: #0c121b;
-  --topbar-shadow: 0 2px 0 #212c3f;
-  --topbar-text: #dce8ff;
+  --topbar-bg: #10151b;
+  --topbar-shadow: none;
+  --topbar-text: #e6ebf7;
 }
 
 .sidebar {
@@ -206,6 +206,11 @@
 .menuItemActive {
   color: #fff;
   background: rgba(255, 255, 255, 0.12);
+}
+
+.themeWhite .menuItemActive {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text-soft) 12%, transparent);
 }
 
 .menuItemIcon {
@@ -309,7 +314,8 @@
 
 .projectTabsBar {
   height: 34px;
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid color-mix(in srgb, var(--line) 94%, var(--text-soft) 6%);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 94%, var(--text-soft) 6%);
   display: flex;
   align-items: center;
   background: color-mix(in srgb, var(--bg-main) 90%, var(--bg-panel) 10%);
@@ -597,6 +603,24 @@
   background: var(--bg-control);
   color: var(--text);
   padding: 8px;
+}
+
+.fieldLabel select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-control);
+  color: var(--text);
+  padding: 8px;
+}
+
+.settingsPanel {
+  width: min(420px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-panel);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
 }
 
 .createSubmit {
@@ -1548,6 +1572,8 @@
 .pluginBackRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .pluginBackButton {
@@ -1562,6 +1588,25 @@
 
 .pluginBackButton:hover {
   color: var(--text);
+}
+
+.pluginStatusPlain {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.pluginStatusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cb4a4a;
+}
+
+.pluginStatusPlain[data-state='running'] .pluginStatusDot {
+  background: #0d8c53;
 }
 
 .pluginHeader {

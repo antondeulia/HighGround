@@ -40,6 +40,8 @@ interface ProjectDetailViewProps {
   onCreateInstanceTagChange: (value: string) => void;
   onCloseCreateInstance: () => void;
   onSubmitCreateInstance: () => Promise<void>;
+  defaultTerminal: TerminalProfile;
+  defaultIde: IdeProfile;
 }
 
 function truncatePathFromStart(value: string, maxLength = 34): string {
@@ -398,7 +400,9 @@ export function ProjectDetailView({
   onCreateInstanceNameChange,
   onCreateInstanceTagChange,
   onCloseCreateInstance,
-  onSubmitCreateInstance
+  onSubmitCreateInstance,
+  defaultTerminal,
+  defaultIde
 }: ProjectDetailViewProps) {
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
 
@@ -546,8 +550,8 @@ export function ProjectDetailView({
                   onUpdateCommand={onUpdateInstanceCommand}
                   onOpenTerminal={onOpenInstanceTerminal}
                   onOpenVsCode={onOpenInstanceVsCode}
-                  terminalProfile={terminalProfiles[instance.id] ?? 'git-bash'}
-                  ideProfile={ideProfiles[instance.id] ?? 'vscode'}
+                  terminalProfile={terminalProfiles[instance.id] ?? defaultTerminal}
+                  ideProfile={ideProfiles[instance.id] ?? defaultIde}
                   onTerminalProfileChange={onTerminalProfileChange}
                   onIdeProfileChange={onIdeProfileChange}
                   activeMenu={activeMenu}

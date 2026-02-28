@@ -1,6 +1,6 @@
 {
   "name": "folder-manager",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "private": false,
   "main": "main.js",
   "scripts": {
@@ -16,6 +16,7 @@
     "dist:win": "npm run build && npx electron-builder --win nsis --publish never"
   },
   "dependencies": {
+    "chrome-remote-interface": "^0.34.0",
     "next": "14.2.18",
     "react": "18.3.1",
     "react-dom": "18.3.1"

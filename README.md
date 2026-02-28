@@ -1,4 +1,4 @@
-P.s during installing windows will warn you this app may contain some danger, ngl I dont wanna spend some few hundreds of $ for signature so you gotta trust me 😭🙏
+P.s during installing windows will warn you this app may contain some danger, ngl I dont wanna spend some few hundreds of $ for signature so you gotta trust me 😭🙏 (Will appreciate your star by the way (if it works for you), thanks!)
 
 # HighGround
 

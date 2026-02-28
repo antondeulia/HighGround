@@ -43,6 +43,10 @@ function normalizeProjects(rawProjects: Project[]): Project[] {
     instances: Array.isArray(project.instances)
       ? project.instances.map((instance) => ({
           ...instance,
+          localUrl:
+            typeof instance.localUrl === 'string' && instance.localUrl.trim().length > 0
+              ? instance.localUrl
+              : 'http://localhost:${PORT}',
           command: typeof instance.command === 'string' ? instance.command : 'npm run dev',
           running: false
         }))
@@ -393,6 +397,22 @@ export function Workspace() {
     );
   }
 
+  function handleUpdateInstanceLocalUrl(instanceId: string, localUrl: string) {
+    if (!activeProjectId) return;
+
+    setProjects((prev) =>
+      prev.map((project) => {
+        if (project.id !== activeProjectId) return project;
+        return {
+          ...project,
+          instances: project.instances.map((instance) =>
+            instance.id === instanceId ? { ...instance, localUrl } : instance
+          )
+        };
+      })
+    );
+  }
+
   function handleOpenInstanceTerminal(instanceId: string, terminal: TerminalProfile) {
     if (!activeProjectId) return;
 
@@ -635,6 +655,7 @@ export function Workspace() {
               onInstanceSearchChange={setInstanceSearch}
               onToggleInstanceRun={handleToggleInstanceRun}
               onDeleteInstance={handleDeleteInstance}
+              onUpdateInstanceLocalUrl={handleUpdateInstanceLocalUrl}
               onUpdateInstanceCommand={handleUpdateInstanceCommand}
               onOpenInstanceTerminal={handleOpenInstanceTerminal}
               onOpenInstanceVsCode={handleOpenInstanceVsCode}

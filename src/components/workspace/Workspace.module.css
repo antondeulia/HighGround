@@ -199,6 +199,7 @@
   background: var(--bg-main);
   padding: 24px;
   color: var(--text);
+  overflow: hidden;
 }
 
 .projectTabsBar {
@@ -593,9 +594,9 @@
 .projectsTableWrap,
 .instancesTableWrap {
   margin-top: 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--bg-panel);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .projectsTableWrap {
@@ -612,25 +613,56 @@
   border-collapse: collapse;
 }
 
+.instancesTable {
+  table-layout: fixed;
+}
+
 .projectsTable th,
 .projectsTable td,
 .instancesTable th,
 .instancesTable td {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 2px solid color-mix(in srgb, var(--line) 86%, #99a9c6 14%);
   padding: 9px 10px;
   text-align: left;
   vertical-align: middle;
   font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .projectsTable th,
 .instancesTable th {
   color: var(--text-soft);
-  background: color-mix(in srgb, var(--bg-panel) 85%, var(--bg-main) 15%);
+  background: transparent;
 }
 
 .instancesTable th:last-child {
   text-align: right;
+}
+
+.instancesTable th:nth-child(1) {
+  width: 34px;
+}
+
+.instancesTable th:nth-child(2) {
+  width: 56px;
+}
+
+.instancesTable th:nth-child(3) {
+  width: 108px;
+}
+
+.instancesTable th:nth-child(4) {
+  width: 132px;
+}
+
+.instancesTable th:nth-child(5) {
+  width: 250px;
+}
+
+.instancesTable th:nth-child(6) {
+  width: 320px;
 }
 
 .projectsTableRow {
@@ -827,21 +859,33 @@
 }
 
 .instancePathCell {
-  max-width: 320px;
+  width: 132px;
+  max-width: 132px;
 }
 
 .instancePathInner {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .instancePathText {
   min-width: 0;
-  flex: 1;
+  max-width: 86px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.pathTextButton {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  max-width: 86px;
 }
 
 .instanceActions {
@@ -855,30 +899,41 @@
 }
 
 .instanceActionsCell {
-  min-width: 320px;
+  min-width: 170px;
   text-align: right !important;
   position: relative;
 }
 
 .instanceInlineInput {
   width: 100%;
-  min-width: 90px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--bg-control);
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
   padding: 6px 8px;
   font-size: 0.8rem;
+  outline: none;
 }
 
 .commandRunGroup {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  min-width: 260px;
+  max-width: 300px;
 }
 
 .commandRunButton {
   flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-left: 0;
+  border-radius: 0;
 }
 
 .actionCombo {
@@ -965,6 +1020,16 @@
 
 .tooltipWrap:hover::after,
 .tooltipWrap:focus-within::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) rotate(45deg);
+}
+
+.tooltipVisible::before {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.tooltipVisible::after {
   opacity: 1;
   transform: translateX(-50%) translateY(0) rotate(45deg);
 }
@@ -1087,6 +1152,87 @@
 .runButton:hover,
 .iconButton:hover {
   background: color-mix(in srgb, var(--text-soft) 12%, transparent);
+}
+
+.instanceUrlCell {
+  width: 250px;
+}
+
+.instanceUrlInput {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.instanceUrlInput:focus {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line) 40%);
+}
+
+.instanceCommandCell {
+  width: 320px;
+  max-width: 320px;
+}
+
+.instanceSelectCell {
+  width: 34px;
+  max-width: 34px;
+  padding-left: 8px !important;
+  padding-right: 4px !important;
+}
+
+.instanceStatusCell {
+  width: 56px;
+  max-width: 56px;
+}
+
+.instanceNameCell {
+  width: 108px;
+  max-width: 108px;
+}
+
+.instanceCheckbox {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid color-mix(in srgb, var(--line) 70%, var(--text-soft) 30%);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--bg-control) 86%, transparent);
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.instanceCheckbox::before {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border-right: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
+  transform: rotate(45deg) scale(0);
+  transform-origin: center;
+  transition: transform 0.16s ease;
+}
+
+.instanceCheckbox:checked {
+  border-color: color-mix(in srgb, var(--accent) 88%, #ffffff 12%);
+  background: color-mix(in srgb, var(--accent) 88%, #ffffff 12%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.instanceCheckbox:checked::before {
+  transform: rotate(45deg) scale(1);
+}
+
+.instanceCheckbox:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 44%, #ffffff 56%);
+  outline-offset: 1px;
 }
 
 .pluginsView {

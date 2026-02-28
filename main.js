@@ -275,7 +275,12 @@ ipcMain.handle('instance:open-vscode', async (_event, instancePath, ide) => {
 
   try {
     const editorCommand = resolveEditorCommand(ide);
-    const proc = spawn(`${editorCommand} "${instancePath}"`, {
+    const editorArgs = [instancePath];
+    if ((ide || 'vscode') === 'vscode') {
+      editorArgs.unshift('--remote-debugging-port=9222');
+    }
+
+    const proc = spawn(editorCommand, editorArgs, {
       cwd: instancePath,
       shell: true,
       detached: true,

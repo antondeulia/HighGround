@@ -6,6 +6,7 @@ export interface Instance {
   id: string;
   name: string;
   path: string;
+  localUrl: string;
   tag: string;
   imageId: string;
   createdLabel: string;

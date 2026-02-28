@@ -21,6 +21,7 @@ interface ProjectDetailViewProps {
   onInstanceSearchChange: (value: string) => void;
   onToggleInstanceRun: (instanceId: string) => void;
   onDeleteInstance: (instanceId: string) => void;
+  onUpdateInstanceLocalUrl: (instanceId: string, localUrl: string) => void;
   onUpdateInstanceCommand: (instanceId: string, command: string) => void;
   onOpenInstanceTerminal: (instanceId: string, terminal: TerminalProfile) => void;
   onOpenInstanceVsCode: (instanceId: string, ide: IdeProfile) => void;
@@ -31,10 +32,16 @@ interface ProjectDetailViewProps {
   onSubmitCreateInstance: () => Promise<void>;
 }
 
+function truncatePathFromStart(value: string, maxLength = 34): string {
+  if (value.length <= maxLength) return value;
+  return `...${value.slice(value.length - (maxLength - 3))}`;
+}
+
 function InstanceRow({
   instance,
   onToggle,
   onDelete,
+  onUpdateLocalUrl,
   onUpdateCommand,
   onOpenTerminal,
   onOpenVsCode,
@@ -45,6 +52,7 @@ function InstanceRow({
   instance: Instance;
   onToggle: (instanceId: string) => void;
   onDelete: (instanceId: string) => void;
+  onUpdateLocalUrl: (instanceId: string, localUrl: string) => void;
   onUpdateCommand: (instanceId: string, command: string) => void;
   onOpenTerminal: (instanceId: string, terminal: TerminalProfile) => void;
   onOpenVsCode: (instanceId: string, ide: IdeProfile) => void;
@@ -54,8 +62,15 @@ function InstanceRow({
 }) {
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>('git-bash');
   const [ideProfile, setIdeProfile] = useState<IdeProfile>('vscode');
+  const [pathTooltipVisible, setPathTooltipVisible] = useState(false);
   const terminalMenuOpen = activeMenu?.instanceId === instance.id && activeMenu.kind === 'terminal';
   const ideMenuOpen = activeMenu?.instanceId === instance.id && activeMenu.kind === 'ide';
+
+  useEffect(() => {
+    if (!pathTooltipVisible) return;
+    const timeout = window.setTimeout(() => setPathTooltipVisible(false), 2200);
+    return () => window.clearTimeout(timeout);
+  }, [pathTooltipVisible]);
 
   async function handleCopyPath(event: React.MouseEvent<HTMLButtonElement>) {
     event.stopPropagation();
@@ -68,16 +83,28 @@ function InstanceRow({
 
   return (
     <tr className={styles.instanceRow}>
-      <td>
-        <input type="checkbox" />
+      <td className={styles.instanceSelectCell}>
+        <input type="checkbox" className={styles.instanceCheckbox} />
       </td>
-      <td>
+      <td className={styles.instanceStatusCell}>
         <span className={`${styles.statusDot} ${instance.running ? styles.statusDotOnline : ''}`} />
       </td>
-      <td>{instance.name}</td>
+      <td className={styles.instanceNameCell}>{instance.name}</td>
       <td className={styles.instancePathCell}>
         <div className={styles.instancePathInner}>
-          <span className={styles.instancePathText}>{instance.path}</span>
+          <span
+            className={`${styles.tooltipWrap} ${pathTooltipVisible ? styles.tooltipVisible : ''}`}
+            data-tooltip={instance.path}
+          >
+            <button
+              type="button"
+              className={styles.pathTextButton}
+              onClick={() => setPathTooltipVisible(true)}
+              aria-label={`Show full path for ${instance.name}`}
+            >
+              <span className={styles.instancePathText}>{truncatePathFromStart(instance.path)}</span>
+            </button>
+          </span>
           <button
             type="button"
             className={`${styles.iconButton} ${styles.copyPathButton}`}
@@ -89,7 +116,16 @@ function InstanceRow({
           </button>
         </div>
       </td>
-      <td>
+      <td className={styles.instanceUrlCell}>
+        <input
+          type="text"
+          value={instance.localUrl}
+          onChange={(event) => onUpdateLocalUrl(instance.id, event.target.value)}
+          placeholder="http://localhost:${PORT}"
+          className={styles.instanceUrlInput}
+        />
+      </td>
+      <td className={styles.instanceCommandCell}>
         <div className={styles.commandRunGroup}>
           <input
             type="text"
@@ -264,6 +300,7 @@ export function ProjectDetailView({
   onInstanceSearchChange,
   onToggleInstanceRun,
   onDeleteInstance,
+  onUpdateInstanceLocalUrl,
   onUpdateInstanceCommand,
   onOpenInstanceTerminal,
   onOpenInstanceVsCode,
@@ -402,6 +439,7 @@ export function ProjectDetailView({
                 <th>Status</th>
                 <th>Name</th>
                 <th>Path</th>
+                <th>Local URL</th>
                 <th>Command</th>
                 <th>Actions</th>
               </tr>
@@ -413,6 +451,7 @@ export function ProjectDetailView({
                   instance={instance}
                   onToggle={onToggleInstanceRun}
                   onDelete={onDeleteInstance}
+                  onUpdateLocalUrl={onUpdateInstanceLocalUrl}
                   onUpdateCommand={onUpdateInstanceCommand}
                   onOpenTerminal={onOpenInstanceTerminal}
                   onOpenVsCode={onOpenInstanceVsCode}

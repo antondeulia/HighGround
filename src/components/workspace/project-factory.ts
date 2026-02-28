@@ -34,6 +34,7 @@ export function createInstance(name: string, path: string, tag: string): Instanc
     id: id('inst'),
     name,
     path,
+    localUrl: 'http://localhost:${PORT}',
     tag: tag.trim() || 'latest',
     imageId: Math.random().toString(16).slice(2, 14),
     createdLabel: 'just now',

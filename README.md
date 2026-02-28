@@ -1,3 +1,5 @@
+P.s during installing windows will warn you this app may contain some danger, ngl I dont wanna spend some few hundreds of $ for signature so you gotta trust me 😭🙏
+
 # HighGround
 
 A desktop app for managing IDE instances.

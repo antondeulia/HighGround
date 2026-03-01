@@ -1,6 +1,6 @@
 {
   "name": "folder-manager",
-  "version": "2.3.3",
+  "version": "2.4.1",
   "private": false,
   "main": "main.js",
   "scripts": {

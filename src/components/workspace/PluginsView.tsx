@@ -50,6 +50,12 @@ IMPORTANT: Close all VS Code windows first, then launch VS Code only from this a
 - Clear logs before rerun if needed.`,
     settings: [
       {
+        id: "startWithWindows",
+        label: "Start with Windows",
+        type: "toggle",
+        value: false,
+      },
+      {
         id: "autoRestart",
         label: "Auto-restart on crash",
         type: "toggle",
@@ -70,7 +76,14 @@ Capture elements on websites, add comments, and pass this context to your coding
 ### Notes
 - Plugin UI is ready in this release.
 - Runtime integration is coming soon.`,
-    settings: [],
+    settings: [
+      {
+        id: "startWithWindows",
+        label: "Start with Windows",
+        type: "toggle",
+        value: false,
+      },
+    ],
     comingSoon: true,
   },
 ];
@@ -195,6 +208,9 @@ export function PluginsView() {
   const [startingVsCode, setStartingVsCode] = useState(false);
   const [logs, setLogs] = useState<Record<string, PluginLogEntry[]>>({});
   const [error, setError] = useState("");
+  const [startupBusyByPlugin, setStartupBusyByPlugin] = useState<
+    Record<string, boolean>
+  >({});
 
   useEffect(() => {
     let mounted = true;
@@ -213,6 +229,24 @@ export function PluginsView() {
     }
 
     void hydrateStatus();
+    void (async () => {
+      const result = await window.electron?.getStartupSettings?.();
+      if (!mounted || !result?.ok || !result.settings) return;
+      const startupMap = result.settings.pluginStartWithWindows ?? {};
+      setPluginSettings((prev) => {
+        const next = Object.fromEntries(
+          Object.entries(prev).map(([pluginId, settings]) => [
+            pluginId,
+            settings.map((setting) =>
+              setting.id === "startWithWindows"
+                ? { ...setting, value: Boolean(startupMap[pluginId]) }
+                : setting,
+            ),
+          ]),
+        );
+        return next;
+      });
+    })();
 
     const unsubscribeLog = window.electron?.onPluginLog?.((entry) => {
       setLogs((prev) => {
@@ -324,11 +358,15 @@ export function PluginsView() {
     }
   }
 
-  function updateSetting(
+  async function updateSetting(
     pluginId: string,
     settingId: string,
     nextValue: boolean | string,
   ) {
+    const previousValue =
+      (pluginSettings[pluginId] ?? []).find((setting) => setting.id === settingId)
+        ?.value ?? false;
+
     setPluginSettings((prev) => {
       const current = prev[pluginId] ?? [];
       const next = current.map((setting) =>
@@ -336,6 +374,33 @@ export function PluginsView() {
       );
       return { ...prev, [pluginId]: next };
     });
+
+    if (settingId !== "startWithWindows" || typeof nextValue !== "boolean") {
+      return;
+    }
+
+    setStartupBusyByPlugin((prev) => ({ ...prev, [pluginId]: true }));
+    setError("");
+    try {
+      const result = await window.electron?.setPluginStartup?.(
+        pluginId,
+        nextValue,
+      );
+      if (!result?.ok) {
+        setError(result?.error || "Failed to update plugin startup.");
+        setPluginSettings((prev) => {
+          const current = prev[pluginId] ?? [];
+          const next = current.map((setting) =>
+            setting.id === settingId
+              ? { ...setting, value: previousValue }
+              : setting,
+          );
+          return { ...prev, [pluginId]: next };
+        });
+      }
+    } finally {
+      setStartupBusyByPlugin((prev) => ({ ...prev, [pluginId]: false }));
+    }
   }
 
   return (
@@ -588,26 +653,46 @@ export function PluginsView() {
               {activeTab === "settings" ? (
                 <div className={styles.pluginSettingsPanel}>
                   {(pluginSettings[selectedPlugin.id] ?? []).map((setting) => (
-                    <label key={setting.id} className={styles.pluginSettingRow}>
-                      <span>{setting.label}</span>
+                    <label
+                      key={setting.id}
+                      className={`${styles.pluginSettingRow} ${
+                        setting.type === "toggle"
+                          ? styles.pluginSettingRowToggle
+                          : styles.pluginSettingRowText
+                      }`}
+                    >
+                      <span className={styles.pluginSettingLabel}>
+                        {setting.label}
+                      </span>
                       {setting.type === "toggle" ? (
-                        <input
-                          type="checkbox"
-                          checked={Boolean(setting.value)}
-                          onChange={(event) =>
-                            updateSetting(
-                              selectedPlugin.id,
-                              setting.id,
-                              event.target.checked,
-                            )
-                          }
-                        />
+                        <span className={styles.toggleSwitch}>
+                          <input
+                            className={styles.toggleInput}
+                            type="checkbox"
+                            checked={Boolean(setting.value)}
+                            onChange={(event) =>
+                              void updateSetting(
+                                selectedPlugin.id,
+                                setting.id,
+                                event.target.checked,
+                              )
+                            }
+                            disabled={
+                              setting.id === "startWithWindows" &&
+                              Boolean(startupBusyByPlugin[selectedPlugin.id])
+                            }
+                          />
+                          <span
+                            className={styles.toggleTrack}
+                            aria-hidden="true"
+                          />
+                        </span>
                       ) : (
                         <input
                           type="text"
                           value={String(setting.value)}
                           onChange={(event) =>
-                            updateSetting(
+                            void updateSetting(
                               selectedPlugin.id,
                               setting.id,
                               event.target.value,

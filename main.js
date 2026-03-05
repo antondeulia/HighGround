@@ -5,6 +5,13 @@ const path = require('path');
 let waitOn = null;
 const http = require('http');
 const next = require('next');
+let autoUpdater = null;
+
+try {
+  ({ autoUpdater } = require('electron-updater'));
+} catch {
+  autoUpdater = null;
+}
 
 const NEXT_PORT = Number(process.env.ELECTRON_NEXT_PORT || 3310);
 const APP_URL = `http://localhost:${NEXT_PORT}`;
@@ -17,6 +24,13 @@ let tray = null;
 let isQuitting = false;
 const instanceProcesses = new Map();
 const pluginProcesses = new Map();
+const updaterState = {
+  status: 'idle',
+  currentVersion: app.getVersion(),
+  availableVersion: null,
+  downloadPercent: null,
+  error: null
+};
 
 const PLUGIN_REGISTRY = {
   'codex-auto-submit': {
@@ -25,6 +39,69 @@ const PLUGIN_REGISTRY = {
     scriptPath: path.join(__dirname, 'src', 'plugins', 'CodexAutoSubmit.js')
   }
 };
+
+const STARTUP_SETTINGS_FILE = 'startup-settings.json';
+const DEFAULT_STARTUP_SETTINGS = {
+  appStartWithWindows: false,
+  pluginStartWithWindows: {}
+};
+
+function getStartupSettingsPath() {
+  return path.join(app.getPath('userData'), STARTUP_SETTINGS_FILE);
+}
+
+function sanitizeStartupSettings(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      ...DEFAULT_STARTUP_SETTINGS,
+      pluginStartWithWindows: {}
+    };
+  }
+
+  const pluginStartWithWindows = {};
+  if (raw.pluginStartWithWindows && typeof raw.pluginStartWithWindows === 'object') {
+    for (const [pluginId, enabled] of Object.entries(raw.pluginStartWithWindows)) {
+      if (typeof enabled === 'boolean') {
+        pluginStartWithWindows[pluginId] = enabled;
+      }
+    }
+  }
+
+  return {
+    appStartWithWindows:
+      typeof raw.appStartWithWindows === 'boolean'
+        ? raw.appStartWithWindows
+        : DEFAULT_STARTUP_SETTINGS.appStartWithWindows,
+    pluginStartWithWindows
+  };
+}
+
+function readStartupSettings() {
+  try {
+    const raw = fs.readFileSync(getStartupSettingsPath(), 'utf8');
+    return sanitizeStartupSettings(JSON.parse(raw));
+  } catch {
+    return {
+      ...DEFAULT_STARTUP_SETTINGS,
+      pluginStartWithWindows: {}
+    };
+  }
+}
+
+function writeStartupSettings(settings) {
+  const sanitized = sanitizeStartupSettings(settings);
+  const targetPath = getStartupSettingsPath();
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  fs.writeFileSync(targetPath, JSON.stringify(sanitized, null, 2), 'utf8');
+  return sanitized;
+}
+
+function setAppLoginStartup(enabled) {
+  if (process.platform !== 'win32') return;
+  app.setLoginItemSettings({
+    openAtLogin: Boolean(enabled)
+  });
+}
 
 function resolveGitBashPath() {
   const candidates = [
@@ -147,6 +224,111 @@ function stopPluginProcess(pluginId) {
   return true;
 }
 
+async function startPluginProcess(pluginId) {
+  if (!pluginId || typeof pluginId !== 'string') {
+    return { ok: false, error: 'Invalid plugin id.' };
+  }
+
+  const plugin = PLUGIN_REGISTRY[pluginId];
+  if (!plugin) {
+    return { ok: false, error: `Unknown plugin: ${pluginId}` };
+  }
+
+  const existing = pluginProcesses.get(pluginId);
+  if (existing && existing.process && !existing.process.killed) {
+    return { ok: true, status: 'running' };
+  }
+
+  const packagedScriptPath = path.join(
+    process.resourcesPath,
+    'app.asar.unpacked',
+    'src',
+    'plugins',
+    path.basename(plugin.scriptPath)
+  );
+  const scriptPath = app.isPackaged && fs.existsSync(packagedScriptPath)
+    ? packagedScriptPath
+    : plugin.scriptPath;
+
+  if (!fs.existsSync(scriptPath)) {
+    return { ok: false, error: `Plugin script not found: ${scriptPath}` };
+  }
+
+  try {
+    const pluginNodePath = app.isPackaged
+      ? path.join(process.resourcesPath, 'app.asar', 'node_modules')
+      : path.join(__dirname, 'node_modules');
+    const nodePathParts = [pluginNodePath];
+    if (process.env.NODE_PATH) {
+      nodePathParts.push(process.env.NODE_PATH);
+    }
+
+    const proc = spawn(process.execPath, [scriptPath], {
+      cwd: app.isPackaged ? process.resourcesPath : __dirname,
+      shell: false,
+      windowsHide: true,
+      detached: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        NODE_PATH: nodePathParts.join(path.delimiter)
+      }
+    });
+
+    const entry = { process: proc, stopping: false };
+    pluginProcesses.set(pluginId, entry);
+
+    sendPluginLog(pluginId, `[Plugin] ${plugin.title} started.`);
+    if (proc.stdout) streamPluginOutput(pluginId, proc.stdout);
+    if (proc.stderr) streamPluginOutput(pluginId, proc.stderr);
+
+    proc.on('exit', (code, signal) => {
+      const finishedEntry = pluginProcesses.get(pluginId);
+      pluginProcesses.delete(pluginId);
+
+      const stoppedByUser = Boolean(finishedEntry?.stopping);
+      const ok = stoppedByUser || code === 0 || signal === 'SIGTERM' || signal === 'SIGINT';
+      const reason = stoppedByUser
+        ? 'Stopped by user.'
+        : `Exited with code=${code ?? 'null'} signal=${signal ?? 'null'}.`;
+
+      sendPluginLog(pluginId, `[Plugin] ${reason}`);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('plugin:exit', { pluginId, ok, error: ok ? undefined : reason });
+      }
+    });
+
+    proc.on('error', (error) => {
+      pluginProcesses.delete(pluginId);
+      const message = error instanceof Error ? error.message : 'Plugin process failed.';
+      sendPluginLog(pluginId, `[Plugin] ${message}`);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('plugin:exit', { pluginId, ok: false, error: message });
+      }
+    });
+
+    return { ok: true, status: 'running' };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Failed to start plugin.' };
+  }
+}
+
+async function autoStartPluginsFromSettings() {
+  const settings = readStartupSettings();
+
+  const pluginIds = Object.keys(PLUGIN_REGISTRY);
+  await Promise.all(
+    pluginIds.map(async (pluginId) => {
+      if (!settings.pluginStartWithWindows?.[pluginId]) return;
+      const result = await startPluginProcess(pluginId);
+      if (!result.ok) {
+        sendPluginLog(pluginId, `[Plugin] Auto-start failed: ${result.error || 'unknown error'}`);
+      }
+    })
+  );
+}
+
 function runProcessAndWait(file, args) {
   return new Promise((resolve) => {
     try {
@@ -199,6 +381,103 @@ function createWindow() {
     if (isQuitting) return;
     event.preventDefault();
     mainWindow.hide();
+  });
+}
+
+function buildUpdaterPayload() {
+  return {
+    ...updaterState,
+    canCheck: !isDev && Boolean(autoUpdater),
+    canInstall: updaterState.status === 'downloaded' && Boolean(autoUpdater)
+  };
+}
+
+function sendUpdaterStatus() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('app:update-status', buildUpdaterPayload());
+}
+
+function setUpdaterState(patch) {
+  Object.assign(updaterState, patch);
+  sendUpdaterStatus();
+}
+
+async function checkForAppUpdates() {
+  if (isDev || !autoUpdater) {
+    setUpdaterState({
+      status: 'idle',
+      currentVersion: app.getVersion(),
+      availableVersion: null,
+      downloadPercent: null,
+      error: null
+    });
+    return { ok: true, skipped: true };
+  }
+
+  try {
+    await autoUpdater.checkForUpdates();
+    return { ok: true };
+  } catch (error) {
+    setUpdaterState({
+      status: 'error',
+      error: error instanceof Error ? error.message : 'Failed to check for updates.'
+    });
+    return { ok: false, error: updaterState.error };
+  }
+}
+
+function setupAutoUpdater() {
+  if (!autoUpdater || isDev) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    setUpdaterState({
+      status: 'checking',
+      currentVersion: app.getVersion(),
+      error: null,
+      downloadPercent: null
+    });
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    setUpdaterState({
+      status: 'available',
+      availableVersion: info?.version || null,
+      error: null,
+      downloadPercent: 0
+    });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    setUpdaterState({
+      status: 'not-available',
+      availableVersion: null,
+      downloadPercent: null,
+      error: null
+    });
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    setUpdaterState({
+      status: 'downloading',
+      downloadPercent: typeof progress?.percent === 'number' ? progress.percent : null
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    setUpdaterState({
+      status: 'downloaded',
+      availableVersion: info?.version || updaterState.availableVersion
+    });
+  });
+
+  autoUpdater.on('error', (error) => {
+    setUpdaterState({
+      status: 'error',
+      error: error?.message || 'Updater failed.'
+    });
   });
 }
 
@@ -304,8 +583,15 @@ async function boot() {
     await startNextProdServer();
   }
 
+  const startupSettings = readStartupSettings();
+  setAppLoginStartup(startupSettings.appStartWithWindows);
+
   createWindow();
   createTray();
+  setupAutoUpdater();
+  sendUpdaterStatus();
+  void checkForAppUpdates();
+  void autoStartPluginsFromSettings();
 }
 
 app.whenReady().then(boot).catch((error) => {
@@ -522,6 +808,82 @@ ipcMain.handle('instance:stop', async (_event, instanceId) => {
   return { ok: true };
 });
 
+ipcMain.handle('settings:get-startup', async () => {
+  return { ok: true, settings: readStartupSettings() };
+});
+
+ipcMain.handle('settings:set-app-startup', async (_event, enabled) => {
+  if (typeof enabled !== 'boolean') {
+    return { ok: false, error: 'Invalid startup flag.' };
+  }
+
+  try {
+    const current = readStartupSettings();
+    const next = writeStartupSettings({
+      ...current,
+      appStartWithWindows: enabled
+    });
+    setAppLoginStartup(enabled);
+    return { ok: true, settings: next };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Failed to save startup settings.' };
+  }
+});
+
+ipcMain.handle('settings:set-plugin-startup', async (_event, payload) => {
+  const pluginId = payload?.pluginId;
+  const enabled = payload?.enabled;
+
+  if (!pluginId || typeof pluginId !== 'string') {
+    return { ok: false, error: 'Invalid plugin id.' };
+  }
+  if (typeof enabled !== 'boolean') {
+    return { ok: false, error: 'Invalid plugin startup flag.' };
+  }
+  if (!PLUGIN_REGISTRY[pluginId]) {
+    return { ok: false, error: `Unknown plugin: ${pluginId}` };
+  }
+
+  try {
+    const current = readStartupSettings();
+    const next = writeStartupSettings({
+      ...current,
+      pluginStartWithWindows: {
+        ...(current.pluginStartWithWindows || {}),
+        [pluginId]: enabled
+      }
+    });
+    return { ok: true, settings: next };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Failed to save plugin startup flag.' };
+  }
+});
+
+ipcMain.handle('app:get-version', async () => {
+  return { ok: true, version: app.getVersion() };
+});
+
+ipcMain.handle('update:get-status', async () => {
+  return { ok: true, ...buildUpdaterPayload() };
+});
+
+ipcMain.handle('update:check', async () => {
+  return checkForAppUpdates();
+});
+
+ipcMain.handle('update:install', async () => {
+  if (isDev || !autoUpdater) {
+    return { ok: false, error: 'Updates are unavailable in development mode.' };
+  }
+  if (updaterState.status !== 'downloaded') {
+    return { ok: false, error: 'Update package is not ready yet.' };
+  }
+
+  isQuitting = true;
+  autoUpdater.quitAndInstall(false, true);
+  return { ok: true };
+});
+
 ipcMain.handle('plugin:status', async (_event, pluginId) => {
   if (!pluginId || typeof pluginId !== 'string') {
     return { ok: false, error: 'Invalid plugin id.' };
@@ -536,93 +898,7 @@ ipcMain.handle('plugin:status', async (_event, pluginId) => {
 });
 
 ipcMain.handle('plugin:start', async (_event, pluginId) => {
-  if (!pluginId || typeof pluginId !== 'string') {
-    return { ok: false, error: 'Invalid plugin id.' };
-  }
-
-  const plugin = PLUGIN_REGISTRY[pluginId];
-  if (!plugin) {
-    return { ok: false, error: `Unknown plugin: ${pluginId}` };
-  }
-
-  const existing = pluginProcesses.get(pluginId);
-  if (existing && existing.process && !existing.process.killed) {
-    return { ok: true, status: 'running' };
-  }
-
-  const packagedScriptPath = path.join(
-    process.resourcesPath,
-    'app.asar.unpacked',
-    'src',
-    'plugins',
-    path.basename(plugin.scriptPath)
-  );
-  const scriptPath = app.isPackaged && fs.existsSync(packagedScriptPath)
-    ? packagedScriptPath
-    : plugin.scriptPath;
-
-  if (!fs.existsSync(scriptPath)) {
-    return { ok: false, error: `Plugin script not found: ${scriptPath}` };
-  }
-
-  try {
-    const pluginNodePath = app.isPackaged
-      ? path.join(process.resourcesPath, 'app.asar', 'node_modules')
-      : path.join(__dirname, 'node_modules');
-    const nodePathParts = [pluginNodePath];
-    if (process.env.NODE_PATH) {
-      nodePathParts.push(process.env.NODE_PATH);
-    }
-
-    const proc = spawn(process.execPath, [scriptPath], {
-      cwd: app.isPackaged ? process.resourcesPath : __dirname,
-      shell: false,
-      windowsHide: true,
-      detached: false,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        ELECTRON_RUN_AS_NODE: '1',
-        NODE_PATH: nodePathParts.join(path.delimiter)
-      }
-    });
-
-    const entry = { process: proc, stopping: false };
-    pluginProcesses.set(pluginId, entry);
-
-    sendPluginLog(pluginId, `[Plugin] ${plugin.title} started.`);
-    if (proc.stdout) streamPluginOutput(pluginId, proc.stdout);
-    if (proc.stderr) streamPluginOutput(pluginId, proc.stderr);
-
-    proc.on('exit', (code, signal) => {
-      const finishedEntry = pluginProcesses.get(pluginId);
-      pluginProcesses.delete(pluginId);
-
-      const stoppedByUser = Boolean(finishedEntry?.stopping);
-      const ok = stoppedByUser || code === 0 || signal === 'SIGTERM' || signal === 'SIGINT';
-      const reason = stoppedByUser
-        ? 'Stopped by user.'
-        : `Exited with code=${code ?? 'null'} signal=${signal ?? 'null'}.`;
-
-      sendPluginLog(pluginId, `[Plugin] ${reason}`);
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('plugin:exit', { pluginId, ok, error: ok ? undefined : reason });
-      }
-    });
-
-    proc.on('error', (error) => {
-      pluginProcesses.delete(pluginId);
-      const message = error instanceof Error ? error.message : 'Plugin process failed.';
-      sendPluginLog(pluginId, `[Plugin] ${message}`);
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('plugin:exit', { pluginId, ok: false, error: message });
-      }
-    });
-
-    return { ok: true, status: 'running' };
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Failed to start plugin.' };
-  }
+  return startPluginProcess(pluginId);
 });
 
 ipcMain.handle('plugin:stop', async (_event, pluginId) => {

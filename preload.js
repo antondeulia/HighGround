@@ -16,6 +16,14 @@ contextBridge.exposeInMainWorld('electron', {
   startPlugin: (pluginId) => ipcRenderer.invoke('plugin:start', pluginId),
   stopPlugin: (pluginId) => ipcRenderer.invoke('plugin:stop', pluginId),
   getPluginStatus: (pluginId) => ipcRenderer.invoke('plugin:status', pluginId),
+  getStartupSettings: () => ipcRenderer.invoke('settings:get-startup'),
+  setAppStartup: (enabled) => ipcRenderer.invoke('settings:set-app-startup', enabled),
+  setPluginStartup: (pluginId, enabled) =>
+    ipcRenderer.invoke('settings:set-plugin-startup', { pluginId, enabled }),
+  getAppVersion: () => ipcRenderer.invoke('app:get-version'),
+  getUpdateStatus: () => ipcRenderer.invoke('update:get-status'),
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
   onInstanceExit: (handler) => {
     const listener = (_event, instanceId) => handler(instanceId);
     ipcRenderer.on('instance:exit', listener);
@@ -35,6 +43,13 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.on('plugin:exit', listener);
     return () => {
       ipcRenderer.removeListener('plugin:exit', listener);
+    };
+  },
+  onUpdateStatus: (handler) => {
+    const listener = (_event, payload) => handler(payload);
+    ipcRenderer.on('app:update-status', listener);
+    return () => {
+      ipcRenderer.removeListener('app:update-status', listener);
     };
   }
 });

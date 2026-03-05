@@ -190,6 +190,15 @@ export function Workspace() {
   const [ideProfiles, setIdeProfiles] = useState<Record<string, IdeProfile>>({});
   const [defaultTerminal, setDefaultTerminal] = useState<TerminalProfile>('git-bash');
   const [defaultIde, setDefaultIde] = useState<IdeProfile>('vscode');
+  const [appStartWithWindows, setAppStartWithWindows] = useState(false);
+  const [startupSettingsBusy, setStartupSettingsBusy] = useState(false);
+  const [startupSettingsError, setStartupSettingsError] = useState('');
+  const [appVersion, setAppVersion] = useState('0.0.0');
+  const [updateState, setUpdateState] = useState<AppUpdateState>({
+    status: 'idle',
+    currentVersion: '0.0.0'
+  });
+  const [updateBusy, setUpdateBusy] = useState(false);
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
   const tabOpenTimersRef = useRef<Record<string, number>>({});
   const tabCloseTimersRef = useRef<Record<string, number>>({});
@@ -272,6 +281,54 @@ export function Workspace() {
     } finally {
       setWorkspaceLoaded(true);
     }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void (async () => {
+      const result = await window.electron?.getStartupSettings?.();
+      if (!mounted || !result?.ok || !result.settings) return;
+      setAppStartWithWindows(Boolean(result.settings.appStartWithWindows));
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void (async () => {
+      const [versionResult, statusResult] = await Promise.all([
+        window.electron?.getAppVersion?.(),
+        window.electron?.getUpdateStatus?.()
+      ]);
+
+      if (!mounted) return;
+
+      if (versionResult?.ok && versionResult.version) {
+        setAppVersion(versionResult.version);
+      }
+      if (statusResult?.ok) {
+        const { ok: _ok, ...nextStatus } = statusResult;
+        setUpdateState((prev) => ({ ...prev, ...nextStatus }));
+      }
+    })();
+
+    const unsubscribe = window.electron?.onUpdateStatus?.((payload) => {
+      setUpdateState((prev) => ({ ...prev, ...payload }));
+      if (payload.currentVersion) {
+        setAppVersion(payload.currentVersion);
+      }
+      setUpdateBusy(false);
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -703,6 +760,89 @@ export function Workspace() {
     setIdeProfiles((prev) => ({ ...prev, [instanceId]: ide }));
   }
 
+  async function handleAppStartupToggle(enabled: boolean) {
+    setStartupSettingsBusy(true);
+    setStartupSettingsError('');
+    setAppStartWithWindows(enabled);
+    try {
+      const result = await window.electron?.setAppStartup?.(enabled);
+      if (!result?.ok || !result.settings) {
+        setStartupSettingsError(result?.error || 'Failed to update app startup.');
+        setAppStartWithWindows((prev) => !prev);
+        return;
+      }
+      setAppStartWithWindows(Boolean(result.settings.appStartWithWindows));
+    } finally {
+      setStartupSettingsBusy(false);
+    }
+  }
+
+  async function handleUpdateAction() {
+    if (updateBusy) return;
+    setUpdateBusy(true);
+
+    try {
+      if (updateState.status === 'downloaded') {
+        const result = await window.electron?.installUpdate?.();
+        if (!result?.ok) {
+          setUpdateState((prev) => ({
+            ...prev,
+            status: 'error',
+            error: result?.error || 'Failed to install update.'
+          }));
+          setUpdateBusy(false);
+        }
+        return;
+      }
+
+      const result = await window.electron?.checkForUpdates?.();
+      if (!result?.ok) {
+        setUpdateState((prev) => ({
+          ...prev,
+          status: 'error',
+          error: result?.error || 'Failed to check updates.'
+        }));
+      }
+    } finally {
+      if (updateState.status !== 'downloaded') {
+        setUpdateBusy(false);
+      }
+    }
+  }
+
+  const updateActionLabel = useMemo(() => {
+    const versionLabel = `v${appVersion}`;
+
+    if (updateBusy || updateState.status === 'checking') {
+      return `Checking updates... ${versionLabel}`;
+    }
+    if (updateState.status === 'downloading') {
+      const percent =
+        typeof updateState.downloadPercent === 'number'
+          ? ` ${Math.round(updateState.downloadPercent)}%`
+          : '';
+      return `Downloading update...${percent}`;
+    }
+    if (updateState.status === 'available' || updateState.status === 'downloaded') {
+      const next = updateState.availableVersion ? `v${updateState.availableVersion}` : 'new version';
+      return updateState.status === 'downloaded'
+        ? `Update ready: ${next}`
+        : `Update to ${next}`;
+    }
+    if (updateState.status === 'error') {
+      return `Update failed - Retry (${versionLabel})`;
+    }
+
+    return `Updated - ${versionLabel}`;
+  }, [appVersion, updateBusy, updateState]);
+
+  const canClickUpdateBadge =
+    updateState.status === 'downloaded' ||
+    updateState.status === 'available' ||
+    updateState.status === 'error' ||
+    updateState.status === 'idle' ||
+    updateState.status === 'not-available';
+
   useEffect(() => {
     const unsubscribe = window.electron?.onInstanceExit?.((instanceId) => {
       setProjects((prev) =>
@@ -972,6 +1112,26 @@ export function Workspace() {
                     <option value="cursor">Cursor</option>
                   </select>
                 </label>
+
+                <label className={`${styles.fieldLabel} ${styles.fieldLabelToggle}`}>
+                  <span>Start app with Windows</span>
+                  <span className={styles.toggleSwitch}>
+                    <input
+                      className={styles.toggleInput}
+                      type="checkbox"
+                      checked={appStartWithWindows}
+                      onChange={(event) => {
+                        void handleAppStartupToggle(event.target.checked);
+                      }}
+                      disabled={startupSettingsBusy}
+                    />
+                    <span className={styles.toggleTrack} aria-hidden="true" />
+                  </span>
+                </label>
+
+                {startupSettingsError ? (
+                  <p className={`${styles.createStatus} ${styles.createStatusError}`}>{startupSettingsError}</p>
+                ) : null}
               </div>
             </section>
           ) : !selectedProject ? (
@@ -1042,6 +1202,20 @@ export function Workspace() {
               defaultIde={defaultIde}
             />
           )}
+
+          <button
+            type="button"
+            className={`${styles.updateBadge} ${canClickUpdateBadge ? styles.updateBadgeAction : ''}`}
+            onClick={() => {
+              if (canClickUpdateBadge) {
+                void handleUpdateAction();
+              }
+            }}
+            disabled={!canClickUpdateBadge || updateBusy}
+            title={updateState.status === 'downloaded' ? 'Install update and restart' : 'Check for updates'}
+          >
+            {updateActionLabel}
+          </button>
         </main>
       </div>
     </div>

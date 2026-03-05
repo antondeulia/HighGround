@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { ThemeMode } from "@/types/project";
 import styles from "./Workspace.module.css";
@@ -107,16 +107,13 @@ export function Sidebar({
 
       <div className={styles.sidebarFooter}>
         <div className={styles.sidebarSupport}>
-          <p className={styles.sidebarSupportText}>
-            Support my unemployed ahh 🙏
-          </p>
           <a
             className={styles.sidebarSupportLink}
             href="https://buymeacoffee.com/antondeulia"
             target="_blank"
             rel="noreferrer noopener"
           >
-            Buy me a coffee
+            Buy me a coffee ☕
           </a>
         </div>
         <div className={styles.sidebarFooterControls}>
@@ -138,10 +135,12 @@ export function Sidebar({
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {isCollapsed ? "»" : "«"}
+            {isCollapsed ? "В»" : "В«"}
           </button>
         </div>
       </div>
     </aside>
   );
 }
+
+
